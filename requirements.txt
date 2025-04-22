@@ -8,3 +8,7 @@ lightgbm
 sktime
 torch
 transformers
+skforecast
+statsmodels
+plotly
+nbformat
