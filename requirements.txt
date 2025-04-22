@@ -8,3 +8,4 @@ lightgbm
 sktime
 torch
 transformers
+neuralprophet
