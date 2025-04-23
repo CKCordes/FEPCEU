@@ -29,14 +29,14 @@ class Dataretreiver():
         
         elif data_src == 'stormglass':
             path_prefix = os.path.dirname(os.path.realpath(__file__))
-            self.sun_df = self._read_weather_csv_data(os.path.join(path_prefix, 'uv_unfolded.csv'))
-            self.wind_df = self._read_weather_csv_data(os.path.join(path_prefix, 'vind_unfolded.csv'))
-            self.temp_df = self._read_weather_csv_data(os.path.join(path_prefix, 'temp_unfolded.csv'))
+            self.sun_df = self._read_weather_csv_data(os.path.join(path_prefix, 'uv_unfolded.csv'), 'sun')
+            self.wind_df = self._read_weather_csv_data(os.path.join(path_prefix, 'vind_unfolded.csv'), 'wind')
+            self.temp_df = self._read_weather_csv_data(os.path.join(path_prefix, 'temp_unfolded.csv'), 'temp')
         
         else:
             raise ValueError("Invalid weather data source")
 
-        #self.combined = self._combine_dfs()
+        self.combined = self._combine_dfs()
         
 
     def _request_DMI(self, parameterId, parameterName, fill_missing):
@@ -155,12 +155,14 @@ class Dataretreiver():
 
         return df_complete
 
-    def _read_weather_csv_data(self, csv_path: str):
+    def _read_weather_csv_data(self, csv_path: str, col_name:str):
         df = pd.read_csv(csv_path)
         df['time'] = pd.to_datetime(df['time'])
         df['time'] = df['time'].dt.tz_localize(None) # Remove timezone
         df.set_index('time', inplace=True)
         df = df.loc[~df.index.duplicated(keep='first')]
+        # Rename columns so we actually can combine them
+        df.rename(columns=lambda x: col_name + '_' + x.lower(), inplace=True)
         return df
 
     def _combine_dfs(self):
