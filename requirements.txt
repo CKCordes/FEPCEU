@@ -12,3 +12,4 @@ skforecast
 statsmodels
 plotly
 nbformat
+neuralprophet
