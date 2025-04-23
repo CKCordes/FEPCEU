@@ -2,31 +2,42 @@ import pandas as pd
 import requests
 from functools import reduce
 import datetime
+import os
+
 
 class Dataretreiver():
-    def __init__(self, debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31"):
+    def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31"):
         """
         ARGS:
-            interval: dict -> expects to find start and end year, month and day
-        """
+        """        
         self.debug = debug
 
         self.start_date = start_date
         self.end_date = end_date
-
-        # This is by far the safest way to store API keys.
-        self.DMI_API_KEY = '65201ca0-3e61-4550-b23d-faf0aa6f3857'
-
-        self.sun_df = self._request_DMI("sun_last1h_glob", "sun", fill_missing)
-        self.wind_df = self._request_DMI("wind_speed_past1h", "wind", fill_missing)
-        self.temp_df = self._request_DMI("temp_mean_past1h", "temp", fill_missing)
-
+        self.sun_df = None
+        self.wind_df = None 
+        self.temp_df = None
+        
         self.elspot_df = self._request_energinet('Elspotprices',fill_missing)
-        self.prod_df = self._request_energinet('ElectricityProdex5MinRealtime', fill_missing)
-        self.gas_df = self._request_energinet('GasDailyBalancingPrice', fill_missing, False)
-        self.co2_df = self._request_energinet('CO2Emis', fill_missing)
+        
+        if data_src == 'dmi':
+            # This is by far the safest way to store API keys.
+            self.DMI_API_KEY = '65201ca0-3e61-4550-b23d-faf0aa6f3857'
+            self.sun_df = self._request_DMI("sun_last1h_glob", "sun", fill_missing)
+            self.wind_df = self._request_DMI("wind_speed_past1h", "wind", fill_missing)
+            self.temp_df = self._request_DMI("temp_mean_past1h", "temp", fill_missing)
+        
+        elif data_src == 'stormglass':
+            path_prefix = os.path.dirname(os.path.realpath(__file__))
+            self.sun_df = self._read_weather_csv_data(os.path.join(path_prefix, 'uv_unfolded.csv'))
+            self.wind_df = self._read_weather_csv_data(os.path.join(path_prefix, 'vind_unfolded.csv'))
+            self.temp_df = self._read_weather_csv_data(os.path.join(path_prefix, 'temp_unfolded.csv'))
+        
+        else:
+            raise ValueError("Invalid weather data source")
 
-        self.combined = self._combine_dfs()
+        #self.combined = self._combine_dfs()
+        
 
     def _request_DMI(self, parameterId, parameterName, fill_missing):
         def request(offset, parameterId, limit=1000):
@@ -144,6 +155,14 @@ class Dataretreiver():
 
         return df_complete
 
+    def _read_weather_csv_data(self, csv_path: str):
+        df = pd.read_csv(csv_path)
+        df['time'] = pd.to_datetime(df['time'])
+        df['time'] = df['time'].dt.tz_localize(None) # Remove timezone
+        df.set_index('time', inplace=True)
+        df = df.loc[~df.index.duplicated(keep='first')]
+        return df
+
     def _combine_dfs(self):
-        dataframes = [self.sun_df, self.wind_df, self.temp_df, self.elspot_df, self.prod_df, self.gas_df, self.co2_df]
+        dataframes = [self.sun_df, self.wind_df, self.temp_df, self.elspot_df]
         return reduce(lambda left, right: pd.merge(left, right, left_index=True, right_index=True, how='inner'), dataframes)
