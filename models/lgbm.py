@@ -56,9 +56,7 @@ class LGBM(AbstractModel):
             return search_space
 
         # Folds training and validation
-        print(f"len(y)={len(y)}")
         self.cv_search = TimeSeriesFold(steps = 36, initial_train_size = len(y)//10, fixed_train_size = False)
-
 
         results, best_trial = bayesian_search_forecaster(
             forecaster    = self.forecaster,
