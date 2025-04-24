@@ -160,6 +160,9 @@ class Dataretreiver():
         df['time'] = pd.to_datetime(df['time'])
         df['time'] = df['time'].dt.tz_localize(None) # Remove timezone
         df.set_index('time', inplace=True)
+        df.sort_index(inplace=True)
+        df = df.resample('H').ffill()
+
         df = df.loc[~df.index.duplicated(keep='first')]
         # Rename columns so we actually can combine them
         df.rename(columns=lambda x: col_name + '_' + x.lower(), inplace=True)

@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from typing import Dict, List, Callable, Any, Optional, Tuple, Union
+from typing import Dict, List, Callable, Optional, Tuple, Union
 from sklearn.metrics import (
     mean_squared_error, 
     mean_absolute_error, 
@@ -9,8 +8,6 @@ from sklearn.metrics import (
     r2_score
 )
 import plotly.graph_objects as go
-
-from sklearn.preprocessing import StandardScaler
 
 from models.model import AbstractModel
 
