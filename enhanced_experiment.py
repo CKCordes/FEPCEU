@@ -9,7 +9,6 @@ from sklearn.metrics import (
 )
 import plotly.graph_objects as go
 import re
-from itertools import combinations, product
 
 from models.model import AbstractModel
 
