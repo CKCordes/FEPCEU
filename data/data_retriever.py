@@ -4,6 +4,11 @@ from functools import reduce
 import datetime
 import os
 from scipy.stats import pearsonr
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 class Dataretreiver():
     def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31"):
@@ -197,3 +202,52 @@ class Dataretreiver():
             for col in top_columns:
                 print(f"{col}: correlation = {correlations[col]:.4f}")
         return top_columns
+    
+    def pca_reduction(self, df:pd.DataFrame, num_of_cols:int = 10, verbose:bool = False):
+        # Step 1: Standardize the features across time (important before PCA!)
+        scaler = StandardScaler()
+        data_scaled = pd.DataFrame(
+            scaler.fit_transform(df),
+            index=df.index,
+            columns=df.columns
+        )
+
+        # Step 2: Apply PCA
+        pca = PCA(n_components=num_of_cols)
+        pca_features = pca.fit_transform(data_scaled.T)  # Notice transpose: (100 points, 500 times) --> (100, 10)
+
+
+        # Step 3: Cluster the PCA-transformed points
+        kmeans = KMeans(n_clusters=num_of_cols, random_state=42)
+        labels = kmeans.fit_predict(pca_features)
+
+        # Step 4: For each cluster, select representative point (closest to cluster center)
+        representatives = []
+        for cluster_id in range(num_of_cols):
+            cluster_indices = np.where(labels == cluster_id)[0]
+            cluster_points = pca_features[cluster_indices]
+            center = kmeans.cluster_centers_[cluster_id]
+            closest_idx = cluster_indices[np.argmin(np.linalg.norm(cluster_points - center, axis=1))]
+            representatives.append(df.columns[closest_idx])
+
+        if verbose:
+            print(f"PCA explained variance ratio: {pca.explained_variance_ratio_.sum():.2%} total variance retained")
+            print("\nSelected representative wind points:")
+            print(representatives)
+            # Optional: Plot clustering if you want to visualize
+            plt.figure(figsize=(8, 6))
+            for label in np.unique(labels):
+                idx = labels == label
+                plt.scatter(pca_features[idx, 0], pca_features[idx, 1], label=f'Cluster {label}')
+            plt.scatter(kmeans.cluster_centers_[:, 0], kmeans.cluster_centers_[:, 1], color='black', marker='x', label='Centers')
+            plt.title('Wind points clustered in PCA space')
+            plt.xlabel('PCA Component 1')
+            plt.ylabel('PCA Component 2')
+            plt.legend()
+            plt.show()
+        
+        # Step 5: Create reduced dataset with selected points
+        return df[representatives]
+
+
+        
