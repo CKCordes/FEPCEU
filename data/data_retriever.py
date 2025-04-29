@@ -11,7 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 
 class Dataretreiver():
-    def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31"):
+    def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31", reduce:str = None):
         """
         ARGS:
         """        
@@ -40,6 +40,19 @@ class Dataretreiver():
         
         else:
             raise ValueError("Invalid weather data source")
+        
+        if reduce == 'pca':
+            self.sun_df = self.pca_reduction(df=self.sun_df, verbose=debug)
+            self.wind_df = self.pca_reduction(df=self.wind_df, verbose=debug)
+            self.temp_df = self.pca_reduction(df=self.temp_df, verbose=debug)
+            
+        elif reduce == 'pearson':
+            self.sun_df = self.correlation_reduce(df=self.sun_df, verbose=debug)
+            self.wind_df = self.correlation_reduce(df=self.wind_df, verbose=debug)
+            self.temp_df = self.correlation_reduce(df=self.temp_df, verbose=debug)
+            
+        elif reduce is not None:
+            print('A reduce keyword was given but not recognized. Use either \'pca\' or \'pearson\'')
 
         self.combined = self._combine_dfs()
         
@@ -247,7 +260,4 @@ class Dataretreiver():
             plt.show()
         
         # Step 5: Create reduced dataset with selected points
-        return df[representatives]
-
-
-        
+        return df[representatives]        

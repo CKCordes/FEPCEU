@@ -57,7 +57,6 @@ class Neuralprophet(AbstractModel):
         # Make new dataframe. It is `forecast_horizon` larger
         df_future = model.make_future_dataframe(self.data, n_historic_predictions=True, periods=forecast_horizon)
         forecast = model.predict(df_future)
-        print(forecast)
         # Prepering data to fit return structure
         prediction_ci = model.get_latest_forecast(forecast)
         prediction = prediction_ci[['ds', 'origin-0']]
