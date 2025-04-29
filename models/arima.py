@@ -30,7 +30,7 @@ class Arima(AbstractModel):
 
     def predict(self, forecast_horizon, X_exog: Optional[pd.DataFrame] = None) -> tuple:
         # Forecast
-        forecast = self.results.get_forecast(steps=forecast_horizon, exog=X_exog.iloc[:forecast_horizon])
+        forecast = self.results.get_forecast(steps=forecast_horizon, exog=(X_exog.iloc[:forecast_horizon] if X_exog is not None else None))
         return pd.DataFrame(forecast.predicted_mean), pd.DataFrame(forecast.conf_int())
 
 

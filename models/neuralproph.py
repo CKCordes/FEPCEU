@@ -7,7 +7,7 @@ from typing import Optional
 from neuralprophet import NeuralProphet, set_log_level
 set_log_level('ERROR')
 
-from model import AbstractModel
+from models.model import AbstractModel
 
 
 class Neuralprophet(AbstractModel):
@@ -37,16 +37,12 @@ class Neuralprophet(AbstractModel):
         self.data = data
 
     def predict(self, forecast_horizon: int, X_exog: Optional[pd.DataFrame] = None) -> np.ndarray:
-
-
         model = NeuralProphet(
             n_lags=self.autoreg_lag,
             n_forecasts=forecast_horizon,
             quantiles=self.quantiles,
             ar_layers=self.ar_layers,
             )
-
-        model.set_plotting_backend('plotly')
 
         # Setup lagged_regressors
         if X_exog is not None:
@@ -61,7 +57,7 @@ class Neuralprophet(AbstractModel):
         # Make new dataframe. It is `forecast_horizon` larger
         df_future = model.make_future_dataframe(self.data, n_historic_predictions=True, periods=forecast_horizon)
         forecast = model.predict(df_future)
-
+        print(forecast)
         # Prepering data to fit return structure
         prediction_ci = model.get_latest_forecast(forecast)
         prediction = prediction_ci[['ds', 'origin-0']]
@@ -77,10 +73,3 @@ class Neuralprophet(AbstractModel):
         ci.columns = ['upper', 'lower']
 
         return prediction, ci
-
-    def plot(self):
-        return self.model.plot(self.forecast)
-
-
-if __name__ == '__main__':
-    print("NeuralProphet constructed succesfully")

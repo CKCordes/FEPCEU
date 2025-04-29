@@ -244,10 +244,10 @@ class EnhancedTimeSeriesExperiment:
         for measurement_type, areas in all_area_columns.items():
             all_areas_columns.extend(areas.values())
         
-        feature_groups.append({
-            'name': 'all_areas',
-            'columns': base_columns + all_areas_columns
-        })
+        #feature_groups.append({
+        #    'name': 'all_areas',
+        #    'columns': base_columns + all_areas_columns
+        #})
         
         # Generate cross-validation splits (same splits for all experiments)
         cv_splits = self.generate_cv_splits(df, first_split_date)

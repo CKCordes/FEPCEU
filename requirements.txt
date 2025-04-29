@@ -13,3 +13,4 @@ statsmodels
 plotly
 nbformat
 neuralprophet
+accelerate

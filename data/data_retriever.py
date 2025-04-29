@@ -3,7 +3,7 @@ import requests
 from functools import reduce
 import datetime
 import os
-
+from scipy.stats import pearsonr
 
 class Dataretreiver():
     def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31"):
@@ -171,3 +171,29 @@ class Dataretreiver():
     def _combine_dfs(self):
         dataframes = [self.sun_df, self.wind_df, self.temp_df, self.elspot_df]
         return reduce(lambda left, right: pd.merge(left, right, left_index=True, right_index=True, how='inner'), dataframes)
+    
+    def correlation_reduce(self, df:pd.DataFrame, num_of_cols: int=10, verbose:bool = False):
+        # Check if the two dataframes are the same length
+        cp_elspot_df = self.elspot_df.copy()
+
+        if len(self.elspot_df.index) != len(df.index):
+            print('WARNING: While correlation reducing, the provided data amount does not match the elspot length. Truncating')
+            # Use the amount with the least amount of indexes
+            max_index = min(df.index[-1], self.elspot_df.index[-1])
+            df = df[:max_index]
+            cp_elspot_df = self.elspot_df[:max_index]
+
+        correlations = {}
+        for col in df.columns:
+            corr, _ = pearsonr(df[col], cp_elspot_df['price'])
+            correlations[col] = corr
+        # Step 2: Sort by absolute correlation strength
+        sorted_cols = sorted(correlations.items(), key=lambda x: abs(x[1]), reverse=True)
+
+        # Step 3: Select top N wind points
+        top_columns = [col for col, corr in sorted_cols[:num_of_cols]]
+        if verbose:
+            print(f"Top {num_of_cols} most correlated with elspot price:")
+            for col in top_columns:
+                print(f"{col}: correlation = {correlations[col]:.4f}")
+        return top_columns

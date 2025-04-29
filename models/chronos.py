@@ -25,6 +25,6 @@ class Chronos(AbstractModel):
             forecast_horizon: int, 
             X_exog: Optional[pd.DataFrame] = None
         ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        fh = ForecastingHorizon(X_exog.index[:forecast_horizon], is_relative=False)
+        fh = ForecastingHorizon(forecast_horizon, is_relative=True)
         y_pred = self.forecaster.predict(fh)  
         return pd.DataFrame(y_pred), None
