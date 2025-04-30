@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import warnings
 import os
 
 
@@ -37,12 +38,20 @@ class Neuralprophet(AbstractModel):
         self.data = data
 
     def predict(self, forecast_horizon: int, X_exog: Optional[pd.DataFrame] = None) -> np.ndarray:
-        model = NeuralProphet(
-            n_lags=self.autoreg_lag,
-            n_forecasts=forecast_horizon,
-            quantiles=self.quantiles,
-            ar_layers=self.ar_layers,
-            )
+
+        if self.autoreg_lag > 0:
+          model = NeuralProphet(
+              n_lags=self.autoreg_lag,
+              n_forecasts=forecast_horizon,
+              quantiles=self.quantiles,
+              ar_layers=self.ar_layers,
+              )
+        else:
+          model = NeuralProphet(
+              quantiles=self.quantiles
+          )
+
+        model.set_plotting_backend('plotly')
 
         # Setup lagged_regressors
         if X_exog is not None:
@@ -50,25 +59,37 @@ class Neuralprophet(AbstractModel):
           for col in self.exog_columns:
             model.add_lagged_regressor(col, n_lags=n_lags)
 
-
-        metrics = model.fit(self.data)
+        with warnings.catch_warnings():
+          warnings.simplefilter('ignore')
+          metrics = model.fit(self.data)
         self.model = model # new (We need to save the model for later plotting)
 
         # Make new dataframe. It is `forecast_horizon` larger
-        df_future = model.make_future_dataframe(self.data, n_historic_predictions=True, periods=forecast_horizon)
-        forecast = model.predict(df_future)
+        with warnings.catch_warnings():
+          warnings.simplefilter('ignore')
+          df_future = model.make_future_dataframe(self.data, n_historic_predictions=True, periods=forecast_horizon)
+          forecast = model.predict(df_future)
+
         # Prepering data to fit return structure
-        prediction_ci = model.get_latest_forecast(forecast)
-        prediction = prediction_ci[['ds', 'origin-0']]
-        prediction.set_index('ds', inplace=True)
+        if self.autoreg_lag > 0:
+          prediction_ci = model.get_latest_forecast(forecast)
+          prediction = prediction_ci[['ds', 'origin-0']]
+          prediction.set_index('ds', inplace=True)
 
-        ci_lower = prediction_ci[['ds', 'origin-0 5.0%']]
-        ci_lower.set_index('ds', inplace=True)
+          ci_lower = prediction_ci[['ds', 'origin-0 5.0%']]
+          ci_lower.set_index('ds', inplace=True)
 
-        ci_upper = prediction_ci[['ds', 'origin-0 95.0%']]
-        ci_upper.set_index('ds', inplace=True)
+          ci_upper = prediction_ci[['ds', 'origin-0 95.0%']]
+          ci_upper.set_index('ds', inplace=True)
 
-        ci = pd.concat([ci_upper, ci_lower], axis=1)
-        ci.columns = ['upper', 'lower']
+          ci = pd.concat([ci_upper, ci_lower], axis=1)
+          ci.columns = ['upper', 'lower']
+        else:
+          # Use standard yhat columns
+          prediction = forecast[['yhat1', 'ds']]
+          prediction.set_index('ds', inplace=True)
+          ci = forecast[[f'yhat1 {int(self.quantiles[1] * 100)}.0%', f'yhat1 {int(self.quantiles[0] * 100)}.0%']]
+          #ci.set_index('ds', inplace=True)
+          ci.columns = ['upper', 'lower']
 
         return prediction, ci
