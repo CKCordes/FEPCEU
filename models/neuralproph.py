@@ -29,6 +29,9 @@ class Neuralprophet(AbstractModel):
         data = y.rename(columns={'price': 'y'}) # NeuralProphet needs a 'y' column
         data['ds'] = data.index # and a 'ds' column for time
 
+        # Saves the cutoff day for later 
+        self.cutoff_day = data['ds'].max()
+
         # NeuralProphet needs y and exog combined in one big dataframe
         if X_exog is not None:
           #X_exog = X_exog.to_frame() # pandas.series to dataframe
@@ -86,10 +89,12 @@ class Neuralprophet(AbstractModel):
           ci.columns = ['upper', 'lower']
         else:
           # Use standard yhat columns
-          prediction = forecast[['yhat1', 'ds']]
+          future_forecast = forecast[forecast['ds'] > self.cutoff_day].copy()
+          prediction = future_forecast[['yhat1', 'ds']]
           prediction.set_index('ds', inplace=True)
-          ci = forecast[[f'yhat1 {int(self.quantiles[1] * 100)}.0%', f'yhat1 {int(self.quantiles[0] * 100)}.0%']]
-          #ci.set_index('ds', inplace=True)
+          ci = future_forecast[[f'yhat1 {int(self.quantiles[1] * 100)}.0%', f'yhat1 {int(self.quantiles[0] * 100)}.0%']]
+
           ci.columns = ['upper', 'lower']
+
 
         return prediction, ci
