@@ -334,7 +334,6 @@ class EnhancedTimeSeriesExperiment:
                                 continue
                         # Add elapsed time as a metric
                         self.feature_group_cv_results[group_name][model_name]['elapsed_time'].append(elapsed_time)
-                        print("feature group cv results:\n", self.feature_group_cv_results[group_name][model_name])
                     except Exception as e:
                         print(f"Error processing model {model_name} in split {i+1}: {str(e)}")
                         continue
