@@ -9,7 +9,7 @@ from sklearn.metrics import (
 )
 import plotly.graph_objects as go
 import re
-
+import time
 from models.model import AbstractModel
 
 class EnhancedTimeSeriesExperiment:
@@ -269,6 +269,8 @@ class EnhancedTimeSeriesExperiment:
             
             for model_name in self.models.keys():
                 self.feature_group_cv_results[group_name][model_name] = {metric: [] for metric in self.metrics.keys()}
+                # Initialize elapsed time
+                self.feature_group_cv_results[group_name][model_name]['elapsed_time'] = []
                 self.feature_group_predictions[group_name][model_name] = []
                 self.feature_group_cis[group_name][model_name] = []
             
@@ -294,7 +296,10 @@ class EnhancedTimeSeriesExperiment:
                     try:
                         # Make a copy of the model
                         model_copy = model
-                        
+                    
+                        # Start timer
+                        start_time = time.perf_counter()
+
                         # Fit model
                         model_copy.fit(y_train, X_train)
                         
@@ -302,6 +307,10 @@ class EnhancedTimeSeriesExperiment:
                         forecast_len = min(self.forecast_horizon, len(y_test))
                         predictions, ci = model_copy.predict(forecast_len, X_test)
                         
+                        # End timer
+                        end_time = time.perf_counter()
+                        elapsed_time = end_time - start_time
+
                         # Store predictions and confidence intervals
                         self.feature_group_predictions[group_name][model_name].append(predictions)
                         self.feature_group_cis[group_name][model_name].append(ci)
@@ -323,7 +332,9 @@ class EnhancedTimeSeriesExperiment:
                             except Exception as e:
                                 print(f"Error calculating {metric_name} for {model_name} in split {i+1}: {str(e)}")
                                 continue
-                    
+                        # Add elapsed time as a metric
+                        self.feature_group_cv_results[group_name][model_name]['elapsed_time'].append(elapsed_time)
+                        print("feature group cv results:\n", self.feature_group_cv_results[group_name][model_name])
                     except Exception as e:
                         print(f"Error processing model {model_name} in split {i+1}: {str(e)}")
                         continue
