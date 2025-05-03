@@ -160,7 +160,8 @@ class EnhancedTimeSeriesExperiment:
         area_config: Optional[Dict[str, List[Set[int]]]] = None,
         custom_feature_combinations: Optional[List[Dict[str, Set[int]]]] = None,
         first_split_date: Optional[Union[str, pd.Timestamp]] = None,
-        add_all_columns: bool = True
+        add_all_columns: bool = True,
+        add_base_columns: bool = True
     ):
         """
         Run experiments with different combinations of area columns.
@@ -187,10 +188,11 @@ class EnhancedTimeSeriesExperiment:
         feature_groups = []
         
         # Add base-only feature group
-        feature_groups.append({
-            'name': 'base_only',
-            'columns': base_columns
-        })
+        if add_base_columns:
+            feature_groups.append({
+                'name': 'base_only',
+                'columns': base_columns
+            })
         
         # Process area_config if provided
         if area_config is not None:
