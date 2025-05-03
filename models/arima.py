@@ -11,13 +11,13 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 class Arima(AbstractModel):
     def __init__(self, order: List[int], seasonal_order: List[int]):
-        self.model = None
+        self.forecaster = None
         self.results = None
         self.order = order
         self.seasonal_order = seasonal_order
     
     def fit(self, y: pd.DataFrame, X_exog: Optional[pd.DataFrame] = None):
-        self.model = sm.tsa.statespace.SARIMAX (
+        self.forecaster = sm.tsa.statespace.SARIMAX (
             y,
             exog=X_exog,
             order=self.order,
@@ -26,7 +26,7 @@ class Arima(AbstractModel):
             enforce_invertibility=False
         )
         print("Fitting ARIMA model with order:", self.order, "and seasonal order:", self.seasonal_order)
-        self.results = self.model.fit()
+        self.results = self.forecaster.fit()
         print("Model fitted successfully.")
 
 
