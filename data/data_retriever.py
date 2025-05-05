@@ -22,6 +22,7 @@ class Dataretreiver():
         self.sun_df = None
         self.wind_df = None 
         self.temp_df = None
+        self.reduction_type = reduce if reduce is not None else 'None'
         
         self.elspot_df = self._request_energinet('Elspotprices',fill_missing)
         
@@ -292,3 +293,31 @@ class Dataretreiver():
 
         print("Top columns selected:", top_columns)
         return df[top_columns]
+
+
+    def save_selected_areas_to_csv(self, filepath: str):
+        """
+        Save the selected feature (area) columns after dimensionality reduction to a timestamped CSV file.
+
+        This method:
+        - Ensures the directory exists.
+        - Appends a timestamp to the filename to avoid overwriting.
+        - Saves the names of the columns in `self.combined` (i.e., the areas kept) to a CSV file.
+
+        Args:
+            filepath (str): The base filepath (including directory and filename) where the CSV should be saved.
+        """
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        # Add timestamp before file extension
+        base, ext = os.path.splitext(filepath)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath_with_timestamp = f"{base}_{self.reduction_type}_{timestamp}{ext}"
+
+        # Extract selected column names
+        selected_columns = self.combined.columns.tolist()
+        df = pd.DataFrame({'selected_areas': selected_columns})
+        df.to_csv(filepath_with_timestamp, index=False)
+
+        print(f"Saved selected area columns to {filepath_with_timestamp}")
+

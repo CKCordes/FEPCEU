@@ -12,6 +12,9 @@ import re
 import time
 from models.model import AbstractModel
 import shap
+from datetime import datetime
+import os
+
 class EnhancedTimeSeriesExperiment:
     def __init__(self, 
                  models: Dict[str, AbstractModel], 
@@ -356,6 +359,44 @@ class EnhancedTimeSeriesExperiment:
                     if values:  # Only calculate if we have values
                         self.feature_group_results[group_name][model_name][f"{metric_name}_mean"] = np.mean(values)
                         self.feature_group_results[group_name][model_name][f"{metric_name}_std"] = np.std(values)
+
+    def save_feature_group_results_to_csv(self, filepath: str):
+        """
+        Save the feature group evaluation results to a timestamped CSV file.
+    
+        This method:
+        - Ensures the output directory exists.
+        - Appends a timestamp to the provided filepath to prevent overwriting.
+        - Converts the nested dictionary `self.feature_group_results` into a flat list of rows.
+        - Writes the results to a CSV file using pandas.
+        - Prints the final path of the saved file.
+        
+        Args:
+            filepath (str): The base filepath (including directory and filename) where the CSV should be saved.
+        """
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        # Add timestamp before file extension
+        base, ext = os.path.splitext(filepath)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath_with_timestamp = f"{base}_{timestamp}{ext}"
+
+        # Build DataFrame
+        rows = []
+        for group_name, models in self.feature_group_results.items():
+            for model_name, metrics in models.items():
+                row = {
+                    'feature_group': group_name,
+                    'model': model_name
+                }
+                row.update(metrics)
+                rows.append(row)
+
+        df = pd.DataFrame(rows)
+        df.to_csv(filepath_with_timestamp, index=False)
+        print(f"Saved feature group results to {filepath_with_timestamp}")
+
     
     def summarize_feature_group_results(self, metric: str = 'MAE') -> pd.DataFrame:
         """
