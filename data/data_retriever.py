@@ -8,10 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
 
 class Dataretreiver():
-    def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31", reduce:str = None):
+    def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31", reduce:str = None, normalize:bool = False):
         """
         ARGS:
         """        
@@ -61,6 +62,15 @@ class Dataretreiver():
             print('A reduce keyword was given but not recognized. Use either \'pca\' or \'pearson\'')
 
         self.combined = self._combine_dfs()
+
+        if normalize:
+            scaler = MinMaxScaler()
+            self.combined = pd.DataFrame(
+                scaler.fit_transform(self.combined),
+                index = self.combined.index,
+                columns = self.combined.columns
+            )
+
         
 
     def _request_DMI(self, parameterId, parameterName, fill_missing):
