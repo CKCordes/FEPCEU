@@ -78,9 +78,6 @@ class LGBM(AbstractModel):
         # Compute SHAP
         self.compute_shap_values(X_exog, y)
 
-        # Plot SHAP
-        self.plot_shap_summary()
-
         return self
 
     def compute_shap_values(self, X_exog: pd.DataFrame, y):
@@ -97,7 +94,7 @@ class LGBM(AbstractModel):
         self.explainer = shap.Explainer(model)  # Automatically uses TreeExplainer
         self.shap_values = self.explainer(X_train_transformed)
 
-        return self.shap_values, X_train_transformed
+        return self.shap_values
 
     def plot_shap_summary(self, plot_type: str = "bar"):
         """
