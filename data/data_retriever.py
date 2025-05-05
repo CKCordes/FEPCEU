@@ -41,10 +41,15 @@ class Dataretreiver():
         else:
             raise ValueError("Invalid weather data source")
         
-        if reduce == 'pca':
-            self.sun_df = self.pca_reduction(df=self.sun_df, verbose=debug)
-            self.wind_df = self.pca_reduction(df=self.wind_df, verbose=debug)
-            self.temp_df = self.pca_reduction(df=self.temp_df, verbose=debug)
+        if reduce == 'pca_kmeans':
+            self.sun_df = self.pca_kmeans_reduction(df=self.sun_df, verbose=debug)
+            self.wind_df = self.pca_kmeans_reduction(df=self.wind_df, verbose=debug)
+            self.temp_df = self.pca_kmeans_reduction(df=self.temp_df, verbose=debug)
+
+        elif reduce == 'pca_pure':
+            self.sun_df = self.pca_pure_reduction(df=self.sun_df, verbose=debug)
+            self.wind_df = self.pca_pure_reduction(df=self.wind_df, verbose=debug)
+            self.temp_df = self.pca_pure_reduction(df=self.temp_df, verbose=debug)
             
         elif reduce == 'pearson':
             self.sun_df = self.correlation_reduce(df=self.sun_df, verbose=debug)
@@ -214,9 +219,9 @@ class Dataretreiver():
             print(f"Top {num_of_cols} most correlated with elspot price:")
             for col in top_columns:
                 print(f"{col}: correlation = {correlations[col]:.4f}")
-        return top_columns
+        return df[top_columns]
     
-    def pca_reduction(self, df:pd.DataFrame, num_of_cols:int = 10, verbose:bool = False):
+    def pca_kmeans_reduction(self, df:pd.DataFrame, num_of_cols:int = 10, verbose:bool = False):
         # Step 1: Standardize the features across time (important before PCA!)
         scaler = StandardScaler()
         data_scaled = pd.DataFrame(
@@ -227,8 +232,7 @@ class Dataretreiver():
 
         # Step 2: Apply PCA
         pca = PCA(n_components=num_of_cols)
-        pca_features = pca.fit_transform(data_scaled.T)  # Notice transpose: (100 points, 500 times) --> (100, 10)
-
+        pca_features = pca.fit_transform(data_scaled.T)
 
         # Step 3: Cluster the PCA-transformed points
         kmeans = KMeans(n_clusters=num_of_cols, random_state=42)
@@ -260,4 +264,31 @@ class Dataretreiver():
             plt.show()
         
         # Step 5: Create reduced dataset with selected points
-        return df[representatives]        
+        return df[representatives]
+
+    def pca_pure_reduction(self, df:pd.DataFrame, num_of_cols:int = 10, verbose:bool = False):
+        scaler = StandardScaler()
+        data_scaled = pd.DataFrame(
+            scaler.fit_transform(df),
+            index=df.index,
+            columns=df.columns
+        )
+
+        # Step 1: Fit PCA on transposed data
+        pca = PCA(n_components=data_scaled.shape[1])  # Choose enough components
+        pca.fit(data_scaled)
+
+        # Step 2: Get absolute loadings (features × components)
+        loadings = np.abs(pca.components_.T)
+
+        # Step 3: Sum absolute loadings aczross top k components (e.g., k=5 or all available)
+        k = min(10, loadings.shape[1])  # Avoid out-of-range slice
+        importance_scores = loadings[:, :k].sum(axis=1)
+
+        # Step 4: Select top 10 columns
+        num_to_select = min(10, len(importance_scores))  # Safe guard
+        top_indices = np.argsort(importance_scores)[-num_to_select:][::-1]
+        top_columns = data_scaled.columns[top_indices].tolist()
+
+        print("Top columns selected:", top_columns)
+        return df[top_columns]

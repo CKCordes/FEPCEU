@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import re
 import time
 from models.model import AbstractModel
+import shap
 from datetime import datetime
 import os
 
@@ -162,7 +163,8 @@ class EnhancedTimeSeriesExperiment:
         area_config: Optional[Dict[str, List[Set[int]]]] = None,
         custom_feature_combinations: Optional[List[Dict[str, Set[int]]]] = None,
         first_split_date: Optional[Union[str, pd.Timestamp]] = None,
-        add_all_columns: bool = True
+        add_all_columns: bool = True,
+        add_base_columns: bool = True
     ):
         """
         Run experiments with different combinations of area columns.
@@ -189,10 +191,11 @@ class EnhancedTimeSeriesExperiment:
         feature_groups = []
         
         # Add base-only feature group
-        feature_groups.append({
-            'name': 'base_only',
-            'columns': base_columns
-        })
+        if add_base_columns:
+            feature_groups.append({
+                'name': 'base_only',
+                'columns': base_columns
+            })
         
         # Process area_config if provided
         if area_config is not None:
@@ -275,7 +278,8 @@ class EnhancedTimeSeriesExperiment:
                 self.feature_group_cv_results[group_name][model_name]['elapsed_time'] = []
                 self.feature_group_predictions[group_name][model_name] = []
                 self.feature_group_cis[group_name][model_name] = []
-            
+                self.feature_group_cv_results[group_name][model_name]['SHAP_values'] = []
+
             # Run each CV split for this feature group
             for i, (train_end, test_end) in enumerate(cv_splits):
                 print(f"Running CV split {i+1}/{len(cv_splits)} for feature group {group_name}")
@@ -336,6 +340,11 @@ class EnhancedTimeSeriesExperiment:
                                 continue
                         # Add elapsed time as a metric
                         self.feature_group_cv_results[group_name][model_name]['elapsed_time'].append(elapsed_time)
+                        
+                        # Add SHAP values as a metric if it is implemented in the model
+                        if hasattr(model, 'compute_shap_values') and callable(getattr(model, 'compute_shap_values')):
+                            self.feature_group_cv_results[group_name][model_name]['SHAP_values'].append(model.shap_values)
+                        # Add SHAP values 
                     except Exception as e:
                         print(f"Error processing model {model_name} in split {i+1}: {str(e)}")
                         continue
@@ -345,6 +354,8 @@ class EnhancedTimeSeriesExperiment:
             for model_name, metrics in self.feature_group_cv_results[group_name].items():
                 self.feature_group_results[group_name][model_name] = {}
                 for metric_name, values in metrics.items():
+                    if metric_name == "SHAP_values":
+                        continue
                     if values:  # Only calculate if we have values
                         self.feature_group_results[group_name][model_name][f"{metric_name}_mean"] = np.mean(values)
                         self.feature_group_results[group_name][model_name][f"{metric_name}_std"] = np.std(values)
@@ -439,6 +450,19 @@ class EnhancedTimeSeriesExperiment:
         feature_groups = list(self.feature_group_results.keys())
         models = list(self.models.keys())
         
+        if metric == "SHAP_values":
+            # First fint the SHAP values to compute
+            for group in feature_groups:
+                for model_name in models:
+                    shap_vals = self.feature_group_cv_results[group][model_name]['SHAP_values']
+                    # Skip models w/o SHAP
+                    if shap_vals == []:
+                        continue
+                    print(f"Plotting SHAP summary plot for {model_name}")
+                    for shap_val in shap_vals:
+                        shap.summary_plot(shap_val)
+            
+            return
         # Create a DataFrame for sorting
         plot_data = []
         for group_name in feature_groups:

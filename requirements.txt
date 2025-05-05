@@ -15,3 +15,4 @@ nbformat
 neuralprophet
 accelerate
 folium
+shap

@@ -4,7 +4,7 @@ from datetime import datetime
 from models.model import AbstractModel
 
 from typing import Optional
-
+import shap
 from lightgbm import LGBMRegressor
 from skforecast.recursive import ForecasterRecursive
 from skforecast.model_selection import (
@@ -21,6 +21,7 @@ class LGBM(AbstractModel):
         self.forecaster = None
         self.results = None
         self.cv_search = None
+        self.shap_values = None
         
     def fit(
             self, 
@@ -68,14 +69,42 @@ class LGBM(AbstractModel):
             n_trials      = 20, # Increase this value for a more exhaustive search
             return_best   = True  # Forecaster object is updated with best config
         )
-
         self.forecaster.fit(
             y = y,
             exog = X_exog,
             store_in_sample_residuals = True
         )
 
+        # Compute SHAP
+        self.compute_shap_values(X_exog, y)
+
         return self
+
+    def compute_shap_values(self, X_exog: pd.DataFrame, y):
+        """
+        Compute SHAP values for the fitted LGBMRegressor in the recursive forecaster.
+        """
+        if self.forecaster is None or self.forecaster.regressor is None:
+            raise ValueError("Model must be fit before SHAP values can be computed.")
+        X_train_transformed, _ = self.forecaster.create_train_X_y(y=y, exog=X_exog)
+        # Access the trained LGBMRegressor
+        model = self.forecaster.regressor
+
+        # Use TreeExplainer for LightGBM models
+        self.explainer = shap.Explainer(model)  # Automatically uses TreeExplainer
+        self.shap_values = self.explainer(X_train_transformed)
+
+        return self.shap_values
+
+    def plot_shap_summary(self, plot_type: str = "bar"):
+        """
+        Plot SHAP summary using precomputed values or compute them on the fly.
+        """
+        if self.shap_values is None:
+            raise ValueError("SHAP values must be computed before plotting them.")
+
+        # Must use the same matrix passed to compute_shap_values
+        shap.summary_plot(self.shap_values, plot_type=plot_type)
 
     def predict(self, forecast_horizon, X_exog: Optional[pd.DataFrame] = None) -> tuple:
         if self.forecaster is None:

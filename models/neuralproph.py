@@ -14,7 +14,7 @@ from models.model import AbstractModel
 class Neuralprophet(AbstractModel):
     def __init__(self, autoreg_lag: int = 0, exog_lag: Optional[int] = None, confidence_level: float = 0.9, ar_layers: Optional[list[int]] = []):
         os.environ['TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD'] = '1' ## This is needed due to https://github.com/suno-ai/bark/pull/619
-
+        self.forecaster = None
         self.autoreg_lag = autoreg_lag
         self.exog_lag = exog_lag
         self.ar_layers = ar_layers
@@ -65,7 +65,7 @@ class Neuralprophet(AbstractModel):
         with warnings.catch_warnings():
           warnings.simplefilter('ignore')
           metrics = model.fit(self.data)
-        self.model = model # new (We need to save the model for later plotting)
+        self.forecaster = model # We need to save forecaster for SHAP values.
 
         # Make new dataframe. It is `forecast_horizon` larger
         with warnings.catch_warnings():
