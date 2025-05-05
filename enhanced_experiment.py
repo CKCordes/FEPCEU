@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Callable, Optional, Tuple, Union, Set
 from sklearn.metrics import (
-    mean_squared_error, 
+    root_mean_squared_error, 
     mean_absolute_error, 
     mean_absolute_percentage_error, 
     r2_score
@@ -42,7 +42,7 @@ class EnhancedTimeSeriesExperiment:
 
     def _default_metrics(self) -> Dict[str, Callable]:
         return {
-            'MSE': mean_squared_error,
+            'RMSE': root_mean_squared_error,
             'MAE': mean_absolute_error,
             'MAPE': mean_absolute_percentage_error,
             'R2': r2_score
