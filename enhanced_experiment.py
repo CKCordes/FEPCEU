@@ -460,7 +460,7 @@ class EnhancedTimeSeriesExperiment:
                         continue
                     print(f"Plotting SHAP summary plot for {model_name}")
                     for shap_val in shap_vals:
-                        shap.summary_plot(shap_val)
+                        shap.summary_plot(shap_val, plot_type='bar')
             
             return
         # Create a DataFrame for sorting
