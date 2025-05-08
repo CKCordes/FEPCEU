@@ -34,6 +34,7 @@ class TimeGPT(AbstractModel):
 
         predict_df = self.nixtla_client.forecast(
             df=self.train_df,
+            hist_exog_list = self.train_df.drop(columns=['y']).columns.tolist(), 
             h=forecast_horizon,
             level=[90],  # Generate a 90% confidence interval
             finetune_steps=60,  # Specify the number of steps for fine-tuning
