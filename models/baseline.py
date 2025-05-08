@@ -16,7 +16,7 @@ class Baseline(AbstractModel):
             X_exog: Optional[pd.DataFrame] = None
         ):
         self.forecaster = ForecasterEquivalentDate(
-                 offset    = pd.DateOffset(days=1),
+                 offset    = pd.DateOffset(days=7),
                  n_offsets = 1
              )
 
