@@ -244,7 +244,22 @@ class Dataretreiver():
         # Step 2: Apply PCA
         pca = PCA(n_components=num_of_cols)
         pca_features = pca.fit_transform(data_scaled.T)
+        
+        if verbose:
+            inertias = []
+            k_range = range(1, 21)
 
+            for k in k_range:
+                kmeans = KMeans(n_clusters=k, random_state=0).fit(pca_features)
+                inertias.append(kmeans.inertia_)
+
+            # Plot
+            plt.plot(k_range, inertias, marker='o')
+            plt.xlabel('Number of clusters (k)')
+            plt.ylabel('Inertia (SSE)')
+            plt.title(f'Elbow Method For Optimal k - {df.columns[1]}')
+            plt.grid(True)
+            plt.show()
         # Step 3: Cluster the PCA-transformed points
         kmeans = KMeans(n_clusters=num_of_cols, random_state=42)
         labels = kmeans.fit_predict(pca_features)
@@ -301,7 +316,9 @@ class Dataretreiver():
         top_indices = np.argsort(importance_scores)[-num_to_select:][::-1]
         top_columns = data_scaled.columns[top_indices].tolist()
 
-        print("Top columns selected:", top_columns)
+        if verbose:
+            print("Top columns selected:", top_columns)
+            print(f"Total variance explained with the 10 columns: {pca.explained_variance_ratio_[:num_to_select].sum():.2%}")
         return df[top_columns]
 
 
