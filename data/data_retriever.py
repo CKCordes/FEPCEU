@@ -203,7 +203,7 @@ class Dataretreiver():
         return df
 
     def _combine_dfs(self):
-        dataframes = [self.sun_df, self.wind_df, self.temp_df, self.elspot_df]
+        dataframes = [self.sun_df, self.wind_df, self.elspot_df] # self.temp_df
         return reduce(lambda left, right: pd.merge(left, right, left_index=True, right_index=True, how='inner'), dataframes)
     
     def correlation_reduce(self, df:pd.DataFrame, num_of_cols: int=10, verbose:bool = False):

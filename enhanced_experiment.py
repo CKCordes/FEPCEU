@@ -246,7 +246,8 @@ class EnhancedTimeSeriesExperiment:
                     combo_columns.extend([all_area_columns[measurement_type][a] for a in valid_areas])
                 
                 # Create a name for this combination
-                combo_name = "custom_" + "_".join(combo_name_parts)
+                #combo_name = "custom_" + "_".join(combo_name_parts)
+                combo_name = f"custom_area_{idx}"
                 
                 # Add to feature groups
                 feature_groups.append({
