@@ -12,10 +12,15 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 
 class Dataretreiver():
-    def __init__(self, data_src:str = 'stormglass', debug=False, fill_missing=True, start_date: str = "2024-01-01", end_date: str = "2024-12-31", reduce:str = None, normalize:bool = False):
-        """
-        ARGS:
-        """        
+    def __init__(self, 
+                 data_src:str = 'stormglass', 
+                 debug=False, 
+                 fill_missing=True, 
+                 start_date: str = "2024-01-01", 
+                 end_date: str = "2024-12-31", 
+                 reduce:str = None, 
+                 normalize:bool = False):
+           
         self.debug = debug
 
         self.start_date = start_date
@@ -36,9 +41,11 @@ class Dataretreiver():
         
         elif data_src == 'stormglass':
             path_prefix = os.path.dirname(os.path.realpath(__file__))
-            self.sun_df = self._read_weather_csv_data(os.path.join(path_prefix, 'uv_unfolded.csv'), 'sun')
-            self.wind_df = self._read_weather_csv_data(os.path.join(path_prefix, 'vind_unfolded.csv'), 'wind')
-            self.temp_df = self._read_weather_csv_data(os.path.join(path_prefix, 'temp_unfolded.csv'), 'temp')
+            start_dt = datetime.datetime.strptime(self.start_date, '%Y-%m-%d')
+
+            self.sun_df = self._read_weather_csv_data(os.path.join(path_prefix, f'uv_{start_dt.year}.csv'), 'sun')
+            self.wind_df = self._read_weather_csv_data(os.path.join(path_prefix, f'vind_{start_dt.year}.csv'), 'wind')
+            self.temp_df = self._read_weather_csv_data(os.path.join(path_prefix, f'temp_{start_dt.year}.csv'), 'temp')
         
         else:
             raise ValueError("Invalid weather data source")
@@ -190,7 +197,10 @@ class Dataretreiver():
         return df_complete
 
     def _read_weather_csv_data(self, csv_path: str, col_name:str):
-        df = pd.read_csv(csv_path)
+        try:
+            df = pd.read_csv(csv_path)
+        except:
+            raise ValueError("Invalid start date")
         df['time'] = pd.to_datetime(df['time'])
         df['time'] = df['time'].dt.tz_localize(None) # Remove timezone
         df.set_index('time', inplace=True)
