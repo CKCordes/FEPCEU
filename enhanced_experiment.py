@@ -75,32 +75,32 @@ class EnhancedTimeSeriesExperiment:
         return area_columns
     
     def generate_cv_splits(
-        self, 
-        df: pd.DataFrame, 
-        first_split_date: Optional[Union[str, pd.Timestamp]] = None
+    self,
+    df: pd.DataFrame,
+    first_split_date: Optional[Union[str, pd.Timestamp]] = None
     ) -> List[Tuple[int, int]]:
         """
-        Generate indices for cross-validation splits.
-        
+        Generate indices for cross-validation splits using a sliding window approach.
+        The training size remains constant across all splits, equal to the size of the first split.
+
         Args:
             df: DataFrame with datetime index
             first_split_date: Optional datetime (string or Timestamp) for the first train_end
                              If None, a default split will be calculated
-        
         Returns:
-            List of (train_end, test_end) indices
+            List of (train_start, train_end, test_end) indices
         """
         # Convert first_split_date to pd.Timestamp if it's a string
         if isinstance(first_split_date, str):
             first_split_date = pd.Timestamp(first_split_date)
-        
+
         # Check if df has a datetime index
         if not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError("DataFrame must have a DatetimeIndex")
-            
+
         df_length = len(df)
-            
-        # Calculate the start index for the first split
+
+        # Calculate the end index for the first split
         if first_split_date is not None:
             # Find the index position of the date
             if first_split_date not in df.index:
@@ -108,51 +108,60 @@ class EnhancedTimeSeriesExperiment:
                 closest_date = df.index[df.index.get_indexer([first_split_date], method='nearest')[0]]
                 print(f"Warning: {first_split_date} not found in index. Using closest date: {closest_date}")
                 first_split_date = closest_date
-                
             # Get the index position
             first_train_end = df.index.get_loc(first_split_date)
         else:
             # Use default: 50% of data for first training split
             first_train_end = int(df_length * 0.5)
-        
+
         # Ensure first_train_end is valid
         if first_train_end <= 0:
             raise ValueError("First train end must be positive")
-            
         if first_train_end >= df_length - self.forecast_horizon:
-            raise ValueError(f"First train end ({first_train_end}) too close to end of data. " 
-                             f"Need at least {self.forecast_horizon} points after it.")
-        
+            raise ValueError(f"First train end ({first_train_end}) too close to end of data. "
+                            f"Need at least {self.forecast_horizon} points after it.")
+
+        # For window approach: training size is always the same as first split
+        training_size = first_train_end  # This is the window size we'll maintain
+
         # Calculate how many splits we can make
         remaining_length = df_length - first_train_end
         max_splits = 1 + (remaining_length - self.forecast_horizon) // self.step_size
-        
+
         # Use the minimum of requested splits and maximum possible splits
         actual_splits = min(self.n_splits, max_splits)
-        
         if actual_splits < self.n_splits:
             print(f"Warning: Only {actual_splits} splits possible with current data and parameters (requested {self.n_splits})")
-        
+
         # Generate splits
         splits = []
         for i in range(actual_splits):
             # Calculate end of training set
             train_end = first_train_end + (i * self.step_size)
-            
+            # Calculate start of training set to maintain constant window size
+            train_start = train_end - training_size
+
+            # Ensure train_start doesn't go below 0
+            if train_start < 0:
+                train_start = 0
+
             # End of test set is forecast_horizon steps after train_end
             test_end = train_end + self.forecast_horizon
-            
+
             # Ensure test_end doesn't exceed the dataframe length
             if test_end > df_length:
                 test_end = df_length
-            
-            splits.append((train_end, test_end))
-        
+
+            splits.append((train_start, train_end, test_end))
+
         # Print the splits with their corresponding dates for clarity
-        print("Cross-validation splits:")
-        for i, (train_end, test_end) in enumerate(splits):
-            print(f"Split {i+1}: Train end = {df.index[train_end]} (index {train_end}), "
-                  f"Test end = {df.index[test_end-1]} (index {test_end-1})")
+        print("Cross-validation splits with sliding window:")
+        for i, (train_start, train_end, test_end) in enumerate(splits):
+            print(f"Split {i+1}: "
+                  f"Train start = {df.index[train_start]} (index {train_start}), "
+                  f"Train end = {df.index[train_end]} (index {train_end}), "
+                  f"Test end = {df.index[test_end-1]} (index {test_end-1}), "
+                  f"Training size = {train_end - train_start}")
             
         return splits
     
@@ -237,7 +246,8 @@ class EnhancedTimeSeriesExperiment:
                     combo_columns.extend([all_area_columns[measurement_type][a] for a in valid_areas])
                 
                 # Create a name for this combination
-                combo_name = "custom_" + "_".join(combo_name_parts)
+                #combo_name = "custom_" + "_".join(combo_name_parts)
+                combo_name = f"custom_area_{idx}"
                 
                 # Add to feature groups
                 feature_groups.append({
@@ -281,12 +291,12 @@ class EnhancedTimeSeriesExperiment:
                 self.feature_group_cv_results[group_name][model_name]['SHAP_values'] = []
 
             # Run each CV split for this feature group
-            for i, (train_end, test_end) in enumerate(cv_splits):
+            for i, (train_start, train_end, test_end) in enumerate(cv_splits):
                 print(f"Running CV split {i+1}/{len(cv_splits)} for feature group {group_name}")
                 
                 # Get training data
-                y_train = df.iloc[:train_end][self.target_column]
-                X_train = None if not exog_columns else df.iloc[:train_end][exog_columns]
+                y_train = df.iloc[train_start:train_end][self.target_column]
+                X_train = None if not exog_columns else df.iloc[train_start:train_end][exog_columns]
                 
                 # Get test data
                 y_test = df.iloc[train_end:test_end][self.target_column]
