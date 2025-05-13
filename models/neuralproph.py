@@ -12,12 +12,21 @@ from models.model import AbstractModel
 
 
 class Neuralprophet(AbstractModel):
-    def __init__(self, autoreg_lag: int = 0, exog_lag: Optional[int] = None, confidence_level: float = 0.9, ar_layers: Optional[list[int]] = []):
+    def __init__(self, autoreg_lag: int = 48, 
+                 exog_lag: int = 3, 
+                 confidence_level: float = 0.9, 
+                 ar_layers: Optional[list[int]] = [],
+                 n_changepoints: int = 25,
+                 daily_seasonality: bool = True,
+                 weekly_seasonality: bool = True):
         os.environ['TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD'] = '1' ## This is needed due to https://github.com/suno-ai/bark/pull/619
         self.forecaster = None
         self.autoreg_lag = autoreg_lag
         self.exog_lag = exog_lag
         self.ar_layers = ar_layers
+        self.n_changepoints = n_changepoints
+        self.daily_seasonality = daily_seasonality
+        self.weekly_seasonality = weekly_seasonality
 
         confidence_level = confidence_level
         boundaries = round((1 - confidence_level) / 2, 2)
@@ -48,23 +57,25 @@ class Neuralprophet(AbstractModel):
               n_forecasts=forecast_horizon,
               quantiles=self.quantiles,
               ar_layers=self.ar_layers,
+              daily_seasonality=self.daily_seasonality,
+              weekly_seasonality=self.weekly_seasonality,
+              n_changepoints=self.n_changepoints,
               )
         else:
           model = NeuralProphet(
               quantiles=self.quantiles
           )
 
-        model.set_plotting_backend('plotly')
+        #model.set_plotting_backend('plotly')
 
         # Setup lagged_regressors
         if X_exog is not None:
-          n_lags = self.exog_lag if self.exog_lag else 3
           for col in self.exog_columns:
-            model.add_lagged_regressor(col, n_lags=n_lags)
+            model.add_lagged_regressor(col, n_lags = self.exog_lag, normalize='minmax')
 
         with warnings.catch_warnings():
           warnings.simplefilter('ignore')
-          metrics = model.fit(self.data)
+          model.fit(self.data)
         self.forecaster = model # We need to save forecaster for SHAP values.
 
         # Make new dataframe. It is `forecast_horizon` larger
@@ -90,11 +101,10 @@ class Neuralprophet(AbstractModel):
         else:
           # Use standard yhat columns
           future_forecast = forecast[forecast['ds'] > self.cutoff_day].copy()
-          prediction = future_forecast[['yhat1', 'ds']]
+          prediction = future_forecast[['ds', 'yhat1']]
           prediction.set_index('ds', inplace=True)
           ci = future_forecast[[f'yhat1 {int(self.quantiles[1] * 100)}.0%', f'yhat1 {int(self.quantiles[0] * 100)}.0%']]
 
           ci.columns = ['upper', 'lower']
-
 
         return prediction, ci
