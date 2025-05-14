@@ -19,7 +19,8 @@ class Dataretreiver():
                  start_date: str = "2024-01-01", 
                  end_date: str = "2024-12-31", 
                  reduce:str = None, 
-                 normalize:bool = False):
+                 normalize:bool = False,
+                 reduction_num_cols = 10):
            
         self.debug = debug
 
@@ -51,19 +52,19 @@ class Dataretreiver():
             raise ValueError("Invalid weather data source")
         
         if reduce == 'pca_kmeans':
-            self.sun_df = self.pca_kmeans_reduction(df=self.sun_df, verbose=debug)
-            self.wind_df = self.pca_kmeans_reduction(df=self.wind_df, verbose=debug)
-            self.temp_df = self.pca_kmeans_reduction(df=self.temp_df, verbose=debug)
+            self.sun_df = self.pca_kmeans_reduction(df=self.sun_df, verbose=debug, num_of_cols=reduction_num_cols)
+            self.wind_df = self.pca_kmeans_reduction(df=self.wind_df, verbose=debug, num_of_cols=reduction_num_cols)
+            self.temp_df = self.pca_kmeans_reduction(df=self.temp_df, verbose=debug, num_of_cols=reduction_num_cols)
 
         elif reduce == 'pca_pure':
-            self.sun_df = self.pca_pure_reduction(df=self.sun_df, verbose=debug)
-            self.wind_df = self.pca_pure_reduction(df=self.wind_df, verbose=debug)
-            self.temp_df = self.pca_pure_reduction(df=self.temp_df, verbose=debug)
+            self.sun_df = self.pca_pure_reduction(df=self.sun_df, verbose=debug, num_of_cols=reduction_num_cols)
+            self.wind_df = self.pca_pure_reduction(df=self.wind_df, verbose=debug, num_of_cols=reduction_num_cols)
+            self.temp_df = self.pca_pure_reduction(df=self.temp_df, verbose=debug, num_of_cols=reduction_num_cols)
             
         elif reduce == 'pearson':
-            self.sun_df = self.correlation_reduce(df=self.sun_df, verbose=debug)
-            self.wind_df = self.correlation_reduce(df=self.wind_df, verbose=debug)
-            self.temp_df = self.correlation_reduce(df=self.temp_df, verbose=debug)
+            self.sun_df = self.correlation_reduce(df=self.sun_df, verbose=debug, num_of_cols=reduction_num_cols)
+            self.wind_df = self.correlation_reduce(df=self.wind_df, verbose=debug, num_of_cols=reduction_num_cols)
+            self.temp_df = self.correlation_reduce(df=self.temp_df, verbose=debug, num_of_cols=reduction_num_cols)
             
         elif reduce is not None:
             print('A reduce keyword was given but not recognized. Use either \'pca\' or \'pearson\'')
@@ -318,11 +319,11 @@ class Dataretreiver():
         loadings = np.abs(pca.components_.T)
 
         # Step 3: Sum absolute loadings aczross top k components (e.g., k=5 or all available)
-        k = min(10, loadings.shape[1])  # Avoid out-of-range slice
+        k = min(num_of_cols, loadings.shape[1])  # Avoid out-of-range slice
         importance_scores = loadings[:, :k].sum(axis=1)
 
         # Step 4: Select top 10 columns
-        num_to_select = min(10, len(importance_scores))  # Safe guard
+        num_to_select = min(num_of_cols, len(importance_scores))  # Safe guard
         top_indices = np.argsort(importance_scores)[-num_to_select:][::-1]
         top_columns = data_scaled.columns[top_indices].tolist()
 

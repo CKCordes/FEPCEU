@@ -16,3 +16,4 @@ neuralprophet
 accelerate
 folium
 shap
+tqdm
