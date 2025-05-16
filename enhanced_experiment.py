@@ -165,6 +165,97 @@ class EnhancedTimeSeriesExperiment:
             
         return splits
     
+    def adjust_prices_with_wind(self, prices, exog_df, wind_scaling_factor=0.1, sun_scaling_factor=0.1, min_price_factor=0.5):
+        
+
+        # Split wind and sun measurements
+        # Separate wind and sun columns using the regex pattern
+        wind_cols = []
+        sun_cols = []
+
+        pattern = re.compile(r"^(\w+)_area_(\d+)$")
+
+        for col in exog_df.columns:
+            match = pattern.match(col)
+            if match:
+                resource_type = match.group(1).lower()
+                if resource_type == 'wind':
+                    wind_cols.append(col)
+                elif resource_type == 'sun':
+                    sun_cols.append(col)
+        if not wind_cols and not sun_cols:
+            raise ValueError("No columns matching the pattern 'wind_area_X' or 'sun_area_Y' found")
+
+        # Process wind measurements
+        agg_wind = exog_df[wind_cols].mean(axis=1)
+        # Normalize wind to [0, 1] range
+        wind_min = agg_wind.min()
+        wind_max = agg_wind.max()
+        if wind_max > wind_min:
+            norm_wind = (agg_wind - wind_min) / (wind_max - wind_min)
+        else:
+            norm_wind = pd.Series(0, index=agg_wind.index)
+        # Calculate correlation
+        wind_corr = prices.corr(agg_wind)
+
+        # Process sun measurements if available
+        agg_sun = exog_df[sun_cols].mean(axis=1)
+        # Normalize sun to [0, 1] range
+        sun_min = agg_sun.min()
+        sun_max = agg_sun.max()
+        if sun_max > sun_min:
+            norm_sun = (agg_sun - sun_min) / (sun_max - sun_min)
+        else:
+            norm_sun = pd.Series(0, index=agg_sun.index)
+        # Calculate correlation
+        sun_corr = prices.corr(agg_sun)
+        
+
+        # Combine the effects of wind and sun
+        # Higher wind or sun values result in lower prices
+        wind_effect = norm_wind * wind_scaling_factor
+        sun_effect = norm_sun * sun_scaling_factor
+
+        # Total renewable effect (limit to prevent over-adjustment)
+        renewable_effect = (wind_effect + sun_effect).clip(upper=1.0)
+
+        # Calculate adjustment factor: higher renewables = lower price
+        adjustment_factor = 1 - renewable_effect
+
+        # Ensure prices don't go below minimum threshold
+        adjustment_factor = adjustment_factor.clip(lower=min_price_factor)
+
+        # Apply adjustment to prices
+        adjusted_prices = prices * adjustment_factor
+
+        # Calculate correlation between adjusted prices and renewables
+        adj_wind_corr = adjusted_prices.corr(agg_wind)
+        
+        adj_sun_corr = adjusted_prices.corr(agg_sun)
+        
+        # Create combined renewable metric for overall correlation
+        combined_renewable = (norm_wind + norm_sun) / 2 if (wind_cols and sun_cols) else (norm_wind if wind_cols else norm_sun)
+        orig_combined_corr = prices.corr(combined_renewable)
+        adj_combined_corr = adjusted_prices.corr(combined_renewable)
+        print("-" * 70)
+        print("\nOverall Renewable Correlation:")
+        print(f"Original correlation: {orig_combined_corr:.4f}")
+        print(f"Adjusted correlation: {adj_combined_corr:.4f}")
+        print(f"Change: {adj_combined_corr - orig_combined_corr:.4f}")
+        print("-" * 70)
+        print("\nWind Correlation:")
+        print(f"Original correlation between prices and wind: {wind_corr:.4f}")
+        print(f"Adjusted correlation between prices and wind: {adj_wind_corr:.4f}")
+        print(f"Change: {adj_wind_corr - wind_corr:.4f}")
+        print("-" * 70)
+        print("\nSun Correlation:")
+        print(f"Original correlation between prices and sun: {sun_corr:.4f}")
+        print(f"Adjusted correlation between prices and sun: {adj_sun_corr:.4f}")
+        print(f"Change: {adj_sun_corr - sun_corr:.4f}")
+        print("-" * 70)
+
+        return adjusted_prices
+    
     def run_feature_group_experiments(
         self,
         df: pd.DataFrame,
@@ -173,7 +264,10 @@ class EnhancedTimeSeriesExperiment:
         custom_feature_combinations: Optional[List[Dict[str, Set[int]]]] = None,
         first_split_date: Optional[Union[str, pd.Timestamp]] = None,
         add_all_columns: bool = True,
-        add_base_columns: bool = True
+        add_base_columns: bool = True,
+        manipulate: bool = False,
+        manipulate_factor_wind: float = 0.1,
+        manipulate_factor_sun: float = 0.1,
     ):
         """
         Run experiments with different combinations of area columns.
@@ -301,6 +395,9 @@ class EnhancedTimeSeriesExperiment:
                 # Get test data
                 y_test = df.iloc[train_end:test_end][self.target_column]
                 X_test = None if not exog_columns else df.iloc[train_end:test_end][exog_columns]
+
+                if manipulate:
+                    y_test = self.adjust_prices_with_wind(y_test, X_test, sun_scaling_factor=manipulate_factor_sun, wind_scaling_factor=manipulate_factor_wind)
                 
                 # Ensure y_test is not empty
                 if len(y_test) == 0:
