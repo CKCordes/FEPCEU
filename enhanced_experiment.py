@@ -227,7 +227,7 @@ class EnhancedTimeSeriesExperiment:
 
         # Apply adjustment to prices
         adjusted_prices = prices * adjustment_factor
-
+        
         # Calculate correlation between adjusted prices and renewables
         adj_wind_corr = adjusted_prices.corr(agg_wind)
         
@@ -395,10 +395,10 @@ class EnhancedTimeSeriesExperiment:
                 # Get test data
                 y_test = df.iloc[train_end:test_end][self.target_column]
                 X_test = None if not exog_columns else df.iloc[train_end:test_end][exog_columns]
-
-                if manipulate:
-                    y_test = self.adjust_prices_with_wind(y_test, X_test, sun_scaling_factor=manipulate_factor_sun, wind_scaling_factor=manipulate_factor_wind)
-                
+                #if manipulate:
+                    #y_train = self.adjust_prices_with_wind(y_train, X_train, sun_scaling_factor=manipulate_factor_sun, wind_scaling_factor=manipulate_factor_wind)
+                   # y_train = y_train.rename("price", inplace=True)
+                    #y_test = self.adjust_prices_with_wind(y_test, X_test, sun_scaling_factor=manipulate_factor_sun, wind_scaling_factor=manipulate_factor_wind)
                 # Ensure y_test is not empty
                 if len(y_test) == 0:
                     print(f"Warning: Test set for split {i+1} is empty. Skipping.")
