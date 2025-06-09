@@ -136,7 +136,11 @@ class Plotter:
         models = {}
 
         for _, row in data.iterrows():
-            model = row['model']
+            if row['model'] == 'ARIMA':
+                model = 'SARIMAX'
+            else:
+                model = row['model']
+                
             feature_group = row['feature_group']
             mean_val = row[f'{metric}_mean']
             std_val = row[f'{metric}_std']
