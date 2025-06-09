@@ -11,16 +11,9 @@ import re
 
 class Plotter:
     def __init__(self, directory):
-        """
-        Initialize the Plotter with the directory containing the CSV files.
-        """
         self.directory = directory
 
     def load_csv_files2(self, pattern, interpolate: bool = False, resolution: int = 100):
-        """
-        Load CSV files matching the given pattern from the directory,
-        add extracted index from filename as a column, and return the combined DataFrame.
-        """
         self.pattern = pattern
         pattern = os.path.join(self.directory, pattern + '*')
         file_paths = glob.glob(pattern)
@@ -45,11 +38,6 @@ class Plotter:
         return combined_df
     
     def load_csv_files(self, pattern, interpolate=False, resolution=39):
-        """
-        Load CSV files matching the given pattern from the directory.
-        Add extracted index from filename as a column.
-        Optionally interpolate missing indices and preserve original values.
-        """
         self.pattern = pattern
         pattern = os.path.join(self.directory, pattern + '*')
         file_paths = glob.glob(pattern)
@@ -60,7 +48,6 @@ class Plotter:
     
         file_paths = sorted(file_paths, key=extract_index)
     
-        # Load and tag each file with its index
         data_frames = []
         for file in file_paths:
             df = pd.read_csv(file)
@@ -79,40 +66,34 @@ class Plotter:
             for group_keys, group_df in combined_df.groupby(group_cols):
                 group_df = group_df.sort_values('index')
     
-                # Skip if not enough points to interpolate
                 if len(group_df) < 2:
                     interpolated_rows.append(group_df)
                     continue
                 
                 x = group_df['index'].values
                 interp_x_full = np.linspace(min(x), max(x), resolution)
-                interp_x_missing = np.setdiff1d(interp_x_full, x)  # Only interpolate missing indices
+                interp_x_missing = np.setdiff1d(interp_x_full, x)
     
-                # Skip if nothing to interpolate
                 if len(interp_x_missing) == 0:
                     interpolated_rows.append(group_df)
                     continue
                 
-                # Interpolate only for missing points
                 interpolated = {}
                 for col in metric_cols:
                     interpolator = interp1d(x, group_df[col], kind='cubic', fill_value='extrapolate')
                     values = interpolator(interp_x_missing)
     
-                    # Optional: apply small randomness to interpolated values
                     random_factors = np.random.uniform(0.96, 1.04, size=len(values))
                     values *= random_factors
     
                     interpolated[col] = values
     
-                # Build new interpolated DataFrame
                 repeated_meta = pd.DataFrame({col: [val]*len(interp_x_missing) for col, val in zip(group_cols, group_keys)})
                 interpolated_df = pd.DataFrame(interpolated)
                 interpolated_df['index'] = interp_x_missing
     
-                # Combine original and interpolated data
                 group_combined = pd.concat([group_df, pd.concat([repeated_meta, interpolated_df], axis=1)], ignore_index=True)
-                group_combined = group_combined.sort_values('index')  # optional: keep it sorted
+                group_combined = group_combined.sort_values('index')
     
                 interpolated_rows.append(group_combined)
     
@@ -128,10 +109,7 @@ class Plotter:
                      y_lim:list[int] = [0,1000], 
                      models_to_skip:list[str] = [],
                      export_path: str = None):
-        """
-        Plot one line per model showing {metric}_mean over index `i`, with std as error bars.
-        """
-        # Store metric values per model across all DataFrames
+        
         data = self.data
         models = {}
 
@@ -144,9 +122,9 @@ class Plotter:
             feature_group = row['feature_group']
             mean_val = row[f'{metric}_mean']
             std_val = row[f'{metric}_std']
-            x_val = row['index']  # Use index column from filename
+            x_val = row['index']  
 
-            feature_and_model = model  # Or f'{feature_group}_{model}' if needed
+            feature_and_model = model 
 
             if model in models_to_skip:
                 continue
@@ -159,7 +137,6 @@ class Plotter:
             models[feature_and_model]['std'].append(std_val)
 
 
-        # Plot each model as a scatter line with error bars
         fig = go.Figure()
 
         for model, values in models.items():
@@ -185,7 +162,6 @@ class Plotter:
             height=400
         )
 
-        # Show or export
         if export_path:
             fig.write_image(export_path)
             
@@ -193,10 +169,6 @@ class Plotter:
 
 
     def generate_plots(self):
-        """
-        Generate plots for MSE, MAE, and elapsed time.
-        """
-        # Load all relevant CSV files
         data = pd.concat([
             self.load_csv_files("pca_kmeans_*.csv"),
             self.load_csv_files("pure_pca_*.csv"),

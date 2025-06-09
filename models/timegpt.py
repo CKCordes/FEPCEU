@@ -9,8 +9,8 @@ class TimeGPT(AbstractModel):
     def __init__(self):
         self.forcaster = None
         self.preds = None
-        # Please dont scrape this
-        self.API_KEY="nixak-dYY7rbjTvFo81RJJ8piW8yH7TWzZ5Ey0dnzleZE0O6pDkEBIEFd93iA5kBWK4QcgOL1eR3Asfnji6Zzj"
+
+        self.API_KEY=""
 
 
     def fit(
@@ -39,7 +39,7 @@ class TimeGPT(AbstractModel):
             level=[90],  # Generate a 90% confidence interval
             finetune_steps=60,  # Specify the number of steps for fine-tuning
             finetune_loss="mae",  # Use the MAE as the loss function for fine-tuning
-            model="timegpt-1-long-horizon",  # Use the model for long-horizon forecasting
+            model="timegpt-1-long-horizon",
             time_col="ds",
             target_col="y",
             id_col='unique_id'

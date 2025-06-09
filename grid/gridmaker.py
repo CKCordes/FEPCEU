@@ -129,11 +129,10 @@ class Grid():
         return m
     
     def get_area_list_from_csv(self, file_path):
-        # Replace with the actual path to your CSV file
 
         with open(file_path, newline='') as csvfile:
             reader = csv.reader(csvfile)
-            next(reader)  # Skip the header
+            next(reader) 
             area_list = [row[0] for row in reader]
 
         return area_list

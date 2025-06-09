@@ -34,8 +34,7 @@ class Dataretreiver():
         self.elspot_df = self._request_energinet('Elspotprices',fill_missing)
         
         if data_src == 'dmi':
-            # This is by far the safest way to store API keys.
-            self.DMI_API_KEY = '65201ca0-3e61-4550-b23d-faf0aa6f3857'
+            self.DMI_API_KEY = ''
             self.sun_df = self._request_DMI("sun_last1h_glob", "sun", fill_missing)
             self.wind_df = self._request_DMI("wind_speed_past1h", "wind", fill_missing)
             self.temp_df = self._request_DMI("temp_mean_past1h", "temp", fill_missing)
@@ -97,9 +96,9 @@ class Dataretreiver():
 
         datetime_start = datetime.datetime.strptime(self.start_date, '%Y-%m-%d')
         datetime_end = datetime.datetime.strptime(self.end_date, '%Y-%m-%d')
-        total_entries = (datetime_end - datetime_start).days * 24#total_entries = 366 * 24 + 365*24  # Number of data points
+        total_entries = (datetime_end - datetime_start).days * 24 # Number of data points
         offset = 0
-        all_obs = []  # To collect all the observations
+        all_obs = [] 
 
         response = request(offset, parameterId, total_entries)
         result = response.json()
@@ -174,7 +173,6 @@ class Dataretreiver():
 
         # Drop duplicates:
         df = df[~df.index.duplicated()]
-        # Reindex your DataFrame to include all hours, filling missing values with the previous value
         df_complete = df.reindex(complete_date_range, method='ffill')
 
         # Check if there are any missing hours
@@ -209,7 +207,6 @@ class Dataretreiver():
         df = df.resample('H').ffill()
 
         df = df.loc[~df.index.duplicated(keep='first')]
-        # Rename columns so we actually can combine them
         df.rename(columns=lambda x: col_name + '_' + x.lower(), inplace=True)
         return df
 
@@ -232,10 +229,8 @@ class Dataretreiver():
         for col in df.columns:
             corr, _ = pearsonr(df[col], cp_elspot_df['price'])
             correlations[col] = corr
-        # Step 2: Sort by absolute correlation strength
         sorted_cols = sorted(correlations.items(), key=lambda x: abs(x[1]), reverse=True)
 
-        # Step 3: Select top N wind points
         top_columns = [col for col, corr in sorted_cols[:num_of_cols]]
         if verbose:
             print(f"Top {num_of_cols} most correlated with elspot price:")
@@ -244,7 +239,6 @@ class Dataretreiver():
         return df[top_columns]
     
     def pca_kmeans_reduction(self, df:pd.DataFrame, num_of_cols:int = 10, verbose:bool = False):
-        # Step 1: Standardize the features across time (important before PCA!)
         scaler = StandardScaler()
         data_scaled = pd.DataFrame(
             scaler.fit_transform(df),
@@ -252,7 +246,6 @@ class Dataretreiver():
             columns=df.columns
         )
 
-        # Step 2: Apply PCA
         pca = PCA(n_components=num_of_cols)
         pca_features = pca.fit_transform(data_scaled.T)
         
@@ -264,18 +257,16 @@ class Dataretreiver():
                 kmeans = KMeans(n_clusters=k, random_state=0).fit(pca_features)
                 inertias.append(kmeans.inertia_)
 
-            # Plot
             plt.plot(k_range, inertias, marker='o')
             plt.xlabel('Number of clusters (k)')
             plt.ylabel('Inertia (SSE)')
             plt.title(f'Elbow Method For Optimal k - {df.columns[1]}')
             plt.grid(True)
             plt.show()
-        # Step 3: Cluster the PCA-transformed points
+
         kmeans = KMeans(n_clusters=num_of_cols, random_state=42)
         labels = kmeans.fit_predict(pca_features)
 
-        # Step 4: For each cluster, select representative point (closest to cluster center)
         representatives = []
         for cluster_id in range(num_of_cols):
             cluster_indices = np.where(labels == cluster_id)[0]
@@ -288,7 +279,7 @@ class Dataretreiver():
             print(f"PCA explained variance ratio: {pca.explained_variance_ratio_.sum():.2%} total variance retained")
             print("\nSelected representative wind points:")
             print(representatives)
-            # Optional: Plot clustering if you want to visualize
+            
             plt.figure(figsize=(8, 6))
             for label in np.unique(labels):
                 idx = labels == label
@@ -300,7 +291,6 @@ class Dataretreiver():
             plt.legend()
             plt.show()
         
-        # Step 5: Create reduced dataset with selected points
         return df[representatives]
 
     def pca_pure_reduction(self, df:pd.DataFrame, num_of_cols:int = 10, verbose:bool = False):
@@ -311,19 +301,15 @@ class Dataretreiver():
             columns=df.columns
         )
 
-        # Step 1: Fit PCA on transposed data
-        pca = PCA(n_components=data_scaled.shape[1])  # Choose enough components
+        pca = PCA(n_components=data_scaled.shape[1])  
         pca.fit(data_scaled)
 
-        # Step 2: Get absolute loadings (features × components)
         loadings = np.abs(pca.components_.T)
 
-        # Step 3: Sum absolute loadings aczross top k components (e.g., k=5 or all available)
-        k = min(num_of_cols, loadings.shape[1])  # Avoid out-of-range slice
+        k = min(num_of_cols, loadings.shape[1])  
         importance_scores = loadings[:, :k].sum(axis=1)
 
-        # Step 4: Select top 10 columns
-        num_to_select = min(num_of_cols, len(importance_scores))  # Safe guard
+        num_to_select = min(num_of_cols, len(importance_scores)) 
         top_indices = np.argsort(importance_scores)[-num_to_select:][::-1]
         top_columns = data_scaled.columns[top_indices].tolist()
 
@@ -347,12 +333,10 @@ class Dataretreiver():
         """
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-        # Add timestamp before file extension
         base, ext = os.path.splitext(filepath)
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath_with_timestamp = f"{base}_{self.reduction_type}_{timestamp}{ext}"
 
-        # Extract selected column names
         selected_columns = self.combined.columns.tolist()
         df = pd.DataFrame({'selected_areas': selected_columns})
         df.to_csv(filepath_with_timestamp, index=False)

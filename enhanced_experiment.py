@@ -90,45 +90,34 @@ class EnhancedTimeSeriesExperiment:
         Returns:
             List of (train_start, train_end, test_end) indices
         """
-        # Convert first_split_date to pd.Timestamp if it's a string
         if isinstance(first_split_date, str):
             first_split_date = pd.Timestamp(first_split_date)
 
-        # Check if df has a datetime index
         if not isinstance(df.index, pd.DatetimeIndex):
             raise ValueError("DataFrame must have a DatetimeIndex")
 
         df_length = len(df)
 
-        # Calculate the end index for the first split
         if first_split_date is not None:
-            # Find the index position of the date
             if first_split_date not in df.index:
-                # Find the closest date that exists in the index
                 closest_date = df.index[df.index.get_indexer([first_split_date], method='nearest')[0]]
                 print(f"Warning: {first_split_date} not found in index. Using closest date: {closest_date}")
                 first_split_date = closest_date
-            # Get the index position
             first_train_end = df.index.get_loc(first_split_date)
         else:
-            # Use default: 50% of data for first training split
             first_train_end = int(df_length * 0.5)
 
-        # Ensure first_train_end is valid
         if first_train_end <= 0:
             raise ValueError("First train end must be positive")
         if first_train_end >= df_length - self.forecast_horizon:
             raise ValueError(f"First train end ({first_train_end}) too close to end of data. "
                             f"Need at least {self.forecast_horizon} points after it.")
 
-        # For window approach: training size is always the same as first split
-        training_size = first_train_end  # This is the window size we'll maintain
+        training_size = first_train_end 
 
-        # Calculate how many splits we can make
         remaining_length = df_length - first_train_end
         max_splits = 1 + (remaining_length - self.forecast_horizon) // self.step_size
 
-        # Use the minimum of requested splits and maximum possible splits
         actual_splits = min(self.n_splits, max_splits)
         if actual_splits < self.n_splits:
             print(f"Warning: Only {actual_splits} splits possible with current data and parameters (requested {self.n_splits})")
@@ -136,25 +125,19 @@ class EnhancedTimeSeriesExperiment:
         # Generate splits
         splits = []
         for i in range(actual_splits):
-            # Calculate end of training set
             train_end = first_train_end + (i * self.step_size)
-            # Calculate start of training set to maintain constant window size
             train_start = train_end - training_size
 
-            # Ensure train_start doesn't go below 0
             if train_start < 0:
                 train_start = 0
 
-            # End of test set is forecast_horizon steps after train_end
             test_end = train_end + self.forecast_horizon
 
-            # Ensure test_end doesn't exceed the dataframe length
             if test_end > df_length:
                 test_end = df_length
 
             splits.append((train_start, train_end, test_end))
 
-        # Print the splits with their corresponding dates for clarity
         print("Cross-validation splits with sliding window:")
         for i, (train_start, train_end, test_end) in enumerate(splits):
             print(f"Split {i+1}: "
@@ -168,8 +151,6 @@ class EnhancedTimeSeriesExperiment:
     def adjust_prices_with_wind(self, prices, exog_df, wind_scaling_factor=0.1, sun_scaling_factor=0.1, min_price_factor=0.5):
         
 
-        # Split wind and sun measurements
-        # Separate wind and sun columns using the regex pattern
         wind_cols = []
         sun_cols = []
 
@@ -186,54 +167,39 @@ class EnhancedTimeSeriesExperiment:
         if not wind_cols and not sun_cols:
             raise ValueError("No columns matching the pattern 'wind_area_X' or 'sun_area_Y' found")
 
-        # Process wind measurements
         agg_wind = exog_df[wind_cols].mean(axis=1)
-        # Normalize wind to [0, 1] range
         wind_min = agg_wind.min()
         wind_max = agg_wind.max()
         if wind_max > wind_min:
             norm_wind = (agg_wind - wind_min) / (wind_max - wind_min)
         else:
             norm_wind = pd.Series(0, index=agg_wind.index)
-        # Calculate correlation
         wind_corr = prices.corr(agg_wind)
 
-        # Process sun measurements if available
         agg_sun = exog_df[sun_cols].mean(axis=1)
-        # Normalize sun to [0, 1] range
         sun_min = agg_sun.min()
         sun_max = agg_sun.max()
         if sun_max > sun_min:
             norm_sun = (agg_sun - sun_min) / (sun_max - sun_min)
         else:
             norm_sun = pd.Series(0, index=agg_sun.index)
-        # Calculate correlation
         sun_corr = prices.corr(agg_sun)
         
-
-        # Combine the effects of wind and sun
-        # Higher wind or sun values result in lower prices
         wind_effect = norm_wind * wind_scaling_factor
         sun_effect = norm_sun * sun_scaling_factor
 
-        # Total renewable effect (limit to prevent over-adjustment)
         renewable_effect = (wind_effect + sun_effect).clip(upper=1.0)
 
-        # Calculate adjustment factor: higher renewables = lower price
         adjustment_factor = 1 - renewable_effect
 
-        # Ensure prices don't go below minimum threshold
         adjustment_factor = adjustment_factor.clip(lower=min_price_factor)
 
-        # Apply adjustment to prices
         adjusted_prices = prices * adjustment_factor
         
-        # Calculate correlation between adjusted prices and renewables
         adj_wind_corr = adjusted_prices.corr(agg_wind)
         
         adj_sun_corr = adjusted_prices.corr(agg_sun)
         
-        # Create combined renewable metric for overall correlation
         combined_renewable = (norm_wind + norm_sun) / 2 if (wind_cols and sun_cols) else (norm_wind if wind_cols else norm_sun)
         orig_combined_corr = prices.corr(combined_renewable)
         adj_combined_corr = adjusted_prices.corr(combined_renewable)
@@ -283,24 +249,20 @@ class EnhancedTimeSeriesExperiment:
                                         Example: [{'sun': {1, 2, 3}, 'wind': {1}, 'temp': {1}}]
             first_split_date: Optional datetime for the first train_end
         """
-        # Identify all area columns in the dataset
         all_area_columns = self._identify_area_columns(df)
         print(f"Identified area columns: {all_area_columns}")
         
         if base_columns is None:
             base_columns = []
         
-        # Initialize feature groups list
         feature_groups = []
         
-        # Add base-only feature group
         if add_base_columns:
             feature_groups.append({
                 'name': 'base_only',
                 'columns': base_columns
             })
         
-        # Process area_config if provided
         if area_config is not None:
             for measurement_type, area_sets in area_config.items():
                 if measurement_type not in all_area_columns:
@@ -308,48 +270,38 @@ class EnhancedTimeSeriesExperiment:
                     continue
                 
                 for area_set in area_sets:
-                    # Create name for this combination
                     combo_name = f"{measurement_type}_areas_" + "_".join(str(a) for a in sorted(area_set))
                     
-                    # Get column names for these areas
                     valid_areas = [a for a in area_set if a in all_area_columns[measurement_type]]
                     combo_columns = [all_area_columns[measurement_type][a] for a in valid_areas]
                     
-                    # Add to feature groups
                     feature_groups.append({
                         'name': combo_name,
                         'columns': base_columns + combo_columns
                     })
         
-        # Process custom feature combinations if provided
         if custom_feature_combinations is not None:
             for idx, combo in enumerate(custom_feature_combinations):
                 combo_name_parts = []
-                combo_columns = list(base_columns)  # Start with base columns
+                combo_columns = list(base_columns) 
                 
                 for measurement_type, area_set in combo.items():
                     if measurement_type not in all_area_columns:
                         print(f"Warning: Measurement type '{measurement_type}' not found in data")
                         continue
                     
-                    # Add to name parts
                     combo_name_parts.append(f"{measurement_type}:[{','.join(str(a) for a in sorted(area_set))}]")
                     
-                    # Add columns for this measurement type
                     valid_areas = [a for a in area_set if a in all_area_columns[measurement_type]]
                     combo_columns.extend([all_area_columns[measurement_type][a] for a in valid_areas])
                 
-                # Create a name for this combination
-                #combo_name = "custom_" + "_".join(combo_name_parts)
                 combo_name = f"custom_area_{idx}"
                 
-                # Add to feature groups
                 feature_groups.append({
                     'name': combo_name,
                     'columns': combo_columns
                 })
         
-        # Add a comprehensive group with all areas if not already added
         all_areas_columns = []
         for measurement_type, areas in all_area_columns.items():
             all_areas_columns.extend(areas.values())
@@ -360,10 +312,8 @@ class EnhancedTimeSeriesExperiment:
                 'columns': base_columns + all_areas_columns
             })
         
-        # Generate cross-validation splits (same splits for all experiments)
         cv_splits = self.generate_cv_splits(df, first_split_date)
         
-        # Run each feature group experiment
         for feature_group in feature_groups:
             group_name = feature_group['name']
             exog_columns = feature_group['columns']
@@ -371,35 +321,27 @@ class EnhancedTimeSeriesExperiment:
             print(f"\n{'='*80}\nRunning experiment for feature group: {group_name}")
             print(f"Using columns: {exog_columns}")
             
-            # Initialize results storage for this feature group
             self.feature_group_cv_results[group_name] = {}
             self.feature_group_predictions[group_name] = {}
             self.feature_group_cis[group_name] = {}
             
             for model_name in self.models.keys():
                 self.feature_group_cv_results[group_name][model_name] = {metric: [] for metric in self.metrics.keys()}
-                # Initialize elapsed time
+                
                 self.feature_group_cv_results[group_name][model_name]['elapsed_time'] = []
                 self.feature_group_predictions[group_name][model_name] = []
                 self.feature_group_cis[group_name][model_name] = []
                 self.feature_group_cv_results[group_name][model_name]['SHAP_values'] = []
 
-            # Run each CV split for this feature group
             for i, (train_start, train_end, test_end) in enumerate(cv_splits):
                 print(f"Running CV split {i+1}/{len(cv_splits)} for feature group {group_name}")
                 
-                # Get training data
                 y_train = df.iloc[train_start:train_end][self.target_column]
                 X_train = None if not exog_columns else df.iloc[train_start:train_end][exog_columns]
                 
-                # Get test data
                 y_test = df.iloc[train_end:test_end][self.target_column]
                 X_test = None if not exog_columns else df.iloc[train_end:test_end][exog_columns]
-                #if manipulate:
-                    #y_train = self.adjust_prices_with_wind(y_train, X_train, sun_scaling_factor=manipulate_factor_sun, wind_scaling_factor=manipulate_factor_wind)
-                   # y_train = y_train.rename("price", inplace=True)
-                    #y_test = self.adjust_prices_with_wind(y_test, X_test, sun_scaling_factor=manipulate_factor_sun, wind_scaling_factor=manipulate_factor_wind)
-                # Ensure y_test is not empty
+                
                 if len(y_test) == 0:
                     print(f"Warning: Test set for split {i+1} is empty. Skipping.")
                     continue
@@ -407,20 +349,15 @@ class EnhancedTimeSeriesExperiment:
                 # Run each model on this fold
                 for model_name, model in self.models.items():
                     try:
-                        # Make a copy of the model
                         model_copy = model
                     
-                        # Start timer
                         start_time = time.perf_counter()
 
-                        # Fit model
                         model_copy.fit(y_train, X_train)
                         
-                        # Predict forecast_horizon steps
                         forecast_len = min(self.forecast_horizon, len(y_test))
                         predictions, ci = model_copy.predict(forecast_len, X_test)
                         
-                        # End timer
                         end_time = time.perf_counter()
                         elapsed_time = end_time - start_time
 
@@ -428,16 +365,13 @@ class EnhancedTimeSeriesExperiment:
                         self.feature_group_predictions[group_name][model_name].append(predictions)
                         self.feature_group_cis[group_name][model_name].append(ci)
                         
-                        # Compare predictions against actual values
                         y_true = y_test.iloc[:len(predictions)]
                         
-                        # Ensure y_true has same number of samples as predictions
                         if len(y_true) != len(predictions):
                             min_len = min(len(y_true), len(predictions))
                             y_true = y_true.iloc[:min_len]
                             predictions = predictions.iloc[:min_len]
                         
-                        # Evaluate metrics
                         for metric_name, metric_func in self.metrics.items():
                             try:
                                 metric_value = metric_func(y_true, predictions)
@@ -445,13 +379,10 @@ class EnhancedTimeSeriesExperiment:
                             except Exception as e:
                                 print(f"Error calculating {metric_name} for {model_name} in split {i+1}: {str(e)}")
                                 continue
-                        # Add elapsed time as a metric
                         self.feature_group_cv_results[group_name][model_name]['elapsed_time'].append(elapsed_time)
                         
-                        # Add SHAP values as a metric if it is implemented in the model
                         if hasattr(model, 'compute_shap_values') and callable(getattr(model, 'compute_shap_values')):
                             self.feature_group_cv_results[group_name][model_name]['SHAP_values'].append(model.shap_values)
-                        # Add SHAP values 
                     except Exception as e:
                         print(f"Error processing model {model_name} in split {i+1}: {str(e)}")
                         continue
@@ -463,7 +394,7 @@ class EnhancedTimeSeriesExperiment:
                 for metric_name, values in metrics.items():
                     if metric_name == "SHAP_values":
                         continue
-                    if values:  # Only calculate if we have values
+                    if values: 
                         self.feature_group_results[group_name][model_name][f"{metric_name}_mean"] = np.mean(values)
                         self.feature_group_results[group_name][model_name][f"{metric_name}_std"] = np.std(values)
 
@@ -481,15 +412,12 @@ class EnhancedTimeSeriesExperiment:
         Args:
             filepath (str): The base filepath (including directory and filename) where the CSV should be saved.
         """
-        # Ensure the directory exists
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
-        # Add timestamp before file extension
         base, ext = os.path.splitext(filepath)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath_with_timestamp = f"{base}_{timestamp}{ext}"
 
-        # Build DataFrame
         rows = []
         for group_name, models in self.feature_group_results.items():
             for model_name, metrics in models.items():
@@ -521,24 +449,19 @@ class EnhancedTimeSeriesExperiment:
                 metric_std_key = f"{metric}_std"
                 
                 if metric_mean_key in model_metrics and metric_std_key in model_metrics:
-                    # Store as "mean ± std" for readable format
                     results[group_name][model_name] = f"{model_metrics[metric_mean_key]:.4f} ± {model_metrics[metric_std_key]:.4f}"
                     
-                    # Also store raw values for sorting
                     results[group_name][f"{model_name}_raw"] = model_metrics[metric_mean_key]
                 else:
                     results[group_name][model_name] = "N/A"
                     results[group_name][f"{model_name}_raw"] = float('inf')
         
-        # Create DataFrame
         results_df = pd.DataFrame.from_dict(results, orient='index')
         
-        # Sort by the best model's performance
         if len(self.models) > 0:
             best_model = list(self.models.keys())[0]
             results_df = results_df.sort_values(f"{best_model}_raw")
             
-        # Drop the raw columns used for sorting
         for model_name in self.models.keys():
             if f"{model_name}_raw" in results_df.columns:
                 results_df = results_df.drop(columns=[f"{model_name}_raw"])
@@ -553,16 +476,13 @@ class EnhancedTimeSeriesExperiment:
             metric: The metric to plot (e.g., 'MAE', 'MSE')
             top_n: If provided, only plot the top N performing feature groups
         """
-        # Prepare data for plotting
         feature_groups = list(self.feature_group_results.keys())
         models = list(self.models.keys())
         
         if metric == "SHAP_values":
-            # First fint the SHAP values to compute
             for group in feature_groups:
                 for model_name in models:
                     shap_vals = self.feature_group_cv_results[group][model_name]['SHAP_values']
-                    # Skip models w/o SHAP
                     if shap_vals == []:
                         continue
                     print(f"Plotting SHAP summary plot for {model_name}")
@@ -570,7 +490,6 @@ class EnhancedTimeSeriesExperiment:
                         shap.summary_plot(shap_val, plot_type='bar')
             
             return
-        # Create a DataFrame for sorting
         plot_data = []
         for group_name in feature_groups:
             row = {'group': group_name}
@@ -583,20 +502,16 @@ class EnhancedTimeSeriesExperiment:
         
         plot_df = pd.DataFrame(plot_data)
         
-        # Sort by the best model's performance
         if len(models) > 0 and len(plot_df) > 0:
             sort_col = models[0]
             if sort_col in plot_df.columns:
                 plot_df = plot_df.sort_values(sort_col)
         
-        # Take only top N if specified
         if top_n is not None and len(plot_df) > top_n:
             plot_df = plot_df.head(top_n)
         
-        # Get ordered feature groups
         ordered_groups = plot_df['group'].tolist() if len(plot_df) > 0 else feature_groups
         
-        # Create figure
         fig = go.Figure()
         
         for model_name in models:
@@ -615,7 +530,6 @@ class EnhancedTimeSeriesExperiment:
                     means.append(None)
                     errors.append(None)
             
-            # Add bar for each model
             fig.add_trace(go.Bar(
                 name=model_name,
                 x=ordered_groups,
@@ -627,7 +541,6 @@ class EnhancedTimeSeriesExperiment:
                 )
             ))
         
-        # Update layout
         fig.update_layout(
             title=f"Feature Group Comparison - {metric}" + (f" (Top {top_n})" if top_n else ""),
             xaxis_title="Feature Group",
@@ -645,24 +558,18 @@ class EnhancedTimeSeriesExperiment:
         """
         Create a visualization that shows the importance of different measurement types and areas.
         """
-        # This is a simple approximation of feature importance based on performance difference
-        # A more sophisticated approach would be needed for true feature importance
         
-        # Get the baseline performance (with only base columns)
         if 'base_only' not in self.feature_group_results:
             print("Baseline 'base_only' group not found. Cannot compute relative importance.")
             return
             
-        # Get model names
         models = list(self.models.keys())
         if not models:
             print("No models available for analysis.")
             return
             
-        # Pick the first model for analysis
         model_name = models[0]
         
-        # Get baseline performance
         baseline_metrics = self.feature_group_results['base_only'].get(model_name, {})
         baseline_value = baseline_metrics.get(f"{metric}_mean")
         
@@ -670,15 +577,12 @@ class EnhancedTimeSeriesExperiment:
             print(f"Baseline metric {metric} not available for model {model_name}.")
             return
             
-        # For each measurement type, calculate improvement when its areas are added
         area_columns = {}
         for group_name, group_results in self.feature_group_results.items():
             if group_name == 'base_only' or group_name == 'all_areas':
                 continue
                 
-            # Extract measurement type and areas from group name
             if 'custom_' in group_name:
-                # Skip custom groups for this analysis
                 continue
                 
             parts = group_name.split('_areas_')
@@ -688,17 +592,14 @@ class EnhancedTimeSeriesExperiment:
             measurement_type = parts[0]
             area_str = parts[1]
             
-            # Get the performance for this group
             group_metrics = group_results.get(model_name, {})
             group_value = group_metrics.get(f"{metric}_mean")
             
             if group_value is None:
                 continue
                 
-            # Calculate improvement (lower is better for most metrics)
             improvement = baseline_value - group_value
             
-            # Store in dictionary
             if measurement_type not in area_columns:
                 area_columns[measurement_type] = []
                 
@@ -707,15 +608,12 @@ class EnhancedTimeSeriesExperiment:
                 'improvement': improvement
             })
         
-        # Create plots for each measurement type
         for measurement_type, improvements in area_columns.items():
             if not improvements:
                 continue
                 
-            # Sort by improvement
             improvements.sort(key=lambda x: x['improvement'], reverse=True)
             
-            # Create figure
             fig = go.Figure(go.Bar(
                 x=[imp['areas'] for imp in improvements],
                 y=[imp['improvement'] for imp in improvements],
@@ -723,7 +621,6 @@ class EnhancedTimeSeriesExperiment:
                 textposition='auto'
             ))
             
-            # Update layout
             fig.update_layout(
                 title=f"Improvement in {metric} with different {measurement_type} areas",
                 xaxis_title="Areas included",
@@ -747,13 +644,10 @@ class EnhancedTimeSeriesExperiment:
                 print(f"No predictions available for model {model_name} in feature group {feature_group}, fold {fold_index}")
                 continue
             
-            # Get predictions for this fold
             fold_predictions = self.feature_group_predictions[feature_group][model_name][fold_index]
             
-            # Create figure
             fig = go.Figure()
             
-            # Add prediction line
             fig.add_trace(go.Scatter(
                 name='Prediction', 
                 x=fold_predictions.index, 
@@ -761,7 +655,6 @@ class EnhancedTimeSeriesExperiment:
                 mode='lines'
             ))
             
-            # Add actual values
             fig.add_trace(go.Scatter(
                 name='Real value', 
                 x=df.index, 
@@ -769,7 +662,6 @@ class EnhancedTimeSeriesExperiment:
                 mode='lines'
             ))
             
-            # Add confidence intervals if available
             if (
                 feature_group in self.feature_group_cis and
                 model_name in self.feature_group_cis[feature_group] and
@@ -799,7 +691,6 @@ class EnhancedTimeSeriesExperiment:
                         showlegend=False
                     ))
             
-            # Update layout
             fig.update_layout(
                 title=f"{model_name}'s Prediction vs Real Values - {feature_group} (Fold {fold_index+1})",
                 xaxis_title="Date",

@@ -19,7 +19,7 @@ class Neuralprophet(AbstractModel):
                  n_changepoints: int = 25,
                  daily_seasonality: bool = True,
                  weekly_seasonality: bool = True):
-        os.environ['TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD'] = '1' ## This is needed due to https://github.com/suno-ai/bark/pull/619
+        os.environ['TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD'] = '1' # This is needed due to https://github.com/suno-ai/bark/pull/619
         self.forecaster = None
         self.autoreg_lag = autoreg_lag
         self.exog_lag = exog_lag
@@ -30,11 +30,12 @@ class Neuralprophet(AbstractModel):
 
         confidence_level = confidence_level
         boundaries = round((1 - confidence_level) / 2, 2)
+
         # NeuralProphet only accepts quantiles value in between 0 and 1
         self.quantiles = [boundaries, confidence_level + boundaries]
 
     def fit(self, y: pd.DataFrame, X_exog: Optional[pd.DataFrame] = None):
-        y = y.to_frame() # pandas.series to dataframe
+        y = y.to_frame() 
         data = y.rename(columns={'price': 'y'}) # NeuralProphet needs a 'y' column
         data['ds'] = data.index # and a 'ds' column for time
 
@@ -43,7 +44,6 @@ class Neuralprophet(AbstractModel):
 
         # NeuralProphet needs y and exog combined in one big dataframe
         if X_exog is not None:
-          #X_exog = X_exog.to_frame() # pandas.series to dataframe
           self.exog_columns = X_exog.columns
           data = pd.merge(left=data, right=X_exog, left_index=True, right_index=True)
 
@@ -66,8 +66,6 @@ class Neuralprophet(AbstractModel):
               quantiles=self.quantiles
           )
 
-        #model.set_plotting_backend('plotly')
-
         # Setup lagged_regressors
         if X_exog is not None:
           for col in self.exog_columns:
@@ -76,9 +74,8 @@ class Neuralprophet(AbstractModel):
         with warnings.catch_warnings():
           warnings.simplefilter('ignore')
           model.fit(self.data)
-        self.forecaster = model # We need to save forecaster for SHAP values.
+        self.forecaster = model
 
-        # Make new dataframe. It is `forecast_horizon` larger
         with warnings.catch_warnings():
           warnings.simplefilter('ignore')
           df_future = model.make_future_dataframe(self.data, n_historic_predictions=True, periods=forecast_horizon)

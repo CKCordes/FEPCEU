@@ -61,13 +61,13 @@ class LGBM(AbstractModel):
 
         results, best_trial = bayesian_search_forecaster(
             forecaster    = self.forecaster,
-            y             = y, #df.loc[:end_validation, 'price'], # Test data not used
-            exog          = X_exog, #df.loc[:end_validation, exog_features],
+            y             = y,
+            exog          = X_exog, 
             cv            = self.cv_search,
             search_space  = search_space,
             metric        = 'mean_absolute_error',
-            n_trials      = 20, # Increase this value for a more exhaustive search
-            return_best   = True  # Forecaster object is updated with best config
+            n_trials      = 20,
+            return_best   = True
         )
         self.forecaster.fit(
             y = y,
@@ -87,11 +87,11 @@ class LGBM(AbstractModel):
         if self.forecaster is None or self.forecaster.regressor is None:
             raise ValueError("Model must be fit before SHAP values can be computed.")
         X_train_transformed, _ = self.forecaster.create_train_X_y(y=y, exog=X_exog)
-        # Access the trained LGBMRegressor
+        
         model = self.forecaster.regressor
 
         # Use TreeExplainer for LightGBM models
-        self.explainer = shap.Explainer(model)  # Automatically uses TreeExplainer
+        self.explainer = shap.Explainer(model)
         self.shap_values = self.explainer(X_train_transformed)
 
         return self.shap_values
